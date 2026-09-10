@@ -1,0 +1,14 @@
+**/node_modules/
+**/dist/
+**/coverage/
+**/.angular/
+**/.cache/
+
+**/package-lock.json
+
+.git/
+.env
+.env.*
+
+*.log
+*.png

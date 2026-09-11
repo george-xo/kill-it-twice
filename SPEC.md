@@ -6,10 +6,11 @@
 
 ## Specifications
 
-| PR  | თემა                      | Specification                                                            | სტატუსი   |
-| --- | ------------------------- | ------------------------------------------------------------------------ | --------- |
-| 01  | საწყისი დოკუმენტაცია      | [specs/01-initial-documentation.md](./specs/01-initial-documentation.md) | Completed |
-| 02  | პროექტის მომზადება        | [specs/02-project-bootstrap.md](./specs/02-project-bootstrap.md)         | Completed |
-| 03  | Source მონაცემები და Seed | [specs/03-source-and-seed.md](./specs/03-source-and-seed.md)             | Planned   |
+| PR  | თემა                                  | Specification                                                            | სტატუსი   |
+| --- | ------------------------------------- | ------------------------------------------------------------------------ | --------- |
+| 01  | საწყისი დოკუმენტაცია                  | [specs/01-initial-documentation.md](./specs/01-initial-documentation.md) | Completed |
+| 02  | პროექტის მომზადება                    | [specs/02-project-bootstrap.md](./specs/02-project-bootstrap.md)         | Completed |
+| 03  | Source მონაცემები და Seed             | [specs/03-source-and-seed.md](./specs/03-source-and-seed.md)             | Completed |
+| 04  | Elasticsearch და RabbitMQ-ში მიწოდება | [specs/04-delivery-foundation.md](./specs/04-delivery-foundation.md)     | Planned   |
 
 შემდეგი specification-ები პროექტის განვითარებასთან ერთად დაემატება.

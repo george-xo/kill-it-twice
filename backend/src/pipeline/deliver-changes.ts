@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { ChangeLogBatchDeliveryService } from './pipeline/delivery/change-log-batch-delivery.service.js';
-import { PipelineRunnerModule } from './pipeline/pipeline-runner.module.js';
+import { ChangeLogBatchDeliveryService } from './delivery/change-log-batch-delivery.service.js';
+import { PipelineRunnerModule } from './pipeline-runner.module.js';
 
 const DELIVERY_LOG_CONTEXT = 'ChangeDelivery';
 const DEFAULT_AFTER_ID = '0';

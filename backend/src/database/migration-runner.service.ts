@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from './database.service.js';
 import { migration001 } from './migrations/001-create-source-tables.js';
+import { migration002 } from './migrations/002-create-backfill-state.js';
 
-const migrations = [migration001];
-
+const migrations = [migration001, migration002];
 @Injectable()
 export class MigrationRunnerService {
   private readonly logger = new Logger(MigrationRunnerService.name);

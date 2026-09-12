@@ -4,6 +4,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
 import { SeedModule } from './seed/seed.module.js';
+import { PipelineModule } from './pipeline/pipeline.module.js';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { SeedModule } from './seed/seed.module.js';
     }),
     DatabaseModule,
     SeedModule,
+    PipelineModule,
   ],
   controllers: [AppController],
   providers: [AppService],

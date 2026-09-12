@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { DatabaseMigrationModule } from './database/database-migration.module.js';
-import { MigrationRunnerService } from './database/migration-runner.service.js';
+import { DatabaseMigrationModule } from './database-migration.module.js';
+import { MigrationRunnerService } from './migration-runner.service.js';
 
 async function migrate(): Promise<void> {
   const application = await NestFactory.createApplicationContext(

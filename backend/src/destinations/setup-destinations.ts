@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DestinationSetupModule } from './destinations/destination-setup.module.js';
-import { ElasticsearchService } from './destinations/elasticsearch/elasticsearch.service.js';
-import { RabbitMqService } from './destinations/rabbitmq/rabbitmq.service.js';
+import { DestinationSetupModule } from './destination-setup.module.js';
+import { ElasticsearchService } from './elasticsearch/elasticsearch.service.js';
+import { RabbitMqService } from './rabbitmq/rabbitmq.service.js';
 
 const DESTINATION_SETUP_LOG_CONTEXT = 'DestinationSetup';
 const logger = new Logger(DESTINATION_SETUP_LOG_CONTEXT);

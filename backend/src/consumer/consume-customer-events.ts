@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { CustomerEventConsumerModule } from './consumer/customer-event-consumer.module.js';
+import { CustomerEventConsumerModule } from './customer-event-consumer.module.js';
 
 const CONSUMER_LOG_CONTEXT = 'CustomerEventConsumer';
 const logger = new Logger(CONSUMER_LOG_CONTEXT);

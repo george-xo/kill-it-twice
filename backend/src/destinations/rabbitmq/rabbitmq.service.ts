@@ -1,4 +1,5 @@
 import { once } from 'node:events';
+
 import {
   Injectable,
   Logger,
@@ -8,18 +9,26 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import type { Channel, ChannelModel, ConfirmChannel } from 'amqplib';
+
 import type { CustomerChangeEvent } from '../../pipeline/contracts/customer-change-event.contract.js';
 import type { CustomerEventHandler } from '../../pipeline/contracts/customer-event-handler.contract.js';
 import { CUSTOMER_EVENTS_TOPOLOGY } from './rabbitmq-topology.definition.js';
+
+const CONSUMER_RECONNECT_DELAY_MS = 1_000;
 
 @Injectable()
 export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RabbitMqService.name);
 
   private connectionUrl = '';
+
   private connection: ChannelModel | null = null;
   private publisherChannel: ConfirmChannel | null = null;
   private consumerChannel: Channel | null = null;
+
+  private consumerHandler: CustomerEventHandler | null = null;
+  private consumerReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
   private topologyReady = false;
   private isShuttingDown = false;
 
@@ -27,8 +36,11 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     const host = this.configService.getOrThrow<string>('RABBITMQ_HOST');
+
     const port = this.configService.getOrThrow<string>('RABBITMQ_PORT');
+
     const username = this.configService.getOrThrow<string>('RABBITMQ_USER');
+
     const password = this.configService.getOrThrow<string>('RABBITMQ_PASSWORD');
 
     this.connectionUrl =
@@ -39,7 +51,6 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
   async isAvailable(): Promise<boolean> {
     try {
       await this.getConnection();
-
       return true;
     } catch {
       return false;
@@ -106,6 +117,31 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
   }
 
   async consumeCustomerChanges(handler: CustomerEventHandler): Promise<void> {
+    this.consumerHandler = handler;
+
+    await this.startConsumer(handler);
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.isShuttingDown = true;
+    this.consumerHandler = null;
+
+    if (this.consumerReconnectTimer !== null) {
+      clearTimeout(this.consumerReconnectTimer);
+      this.consumerReconnectTimer = null;
+    }
+
+    await this.consumerChannel?.close();
+    await this.publisherChannel?.close();
+    await this.connection?.close();
+
+    this.consumerChannel = null;
+    this.publisherChannel = null;
+    this.connection = null;
+    this.topologyReady = false;
+  }
+
+  private async startConsumer(handler: CustomerEventHandler): Promise<void> {
     await this.ensureTopology();
 
     const channel = await this.getConsumerChannel();
@@ -142,17 +178,43 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async onModuleDestroy(): Promise<void> {
-    this.isShuttingDown = true;
+  private scheduleConsumerReconnect(): void {
+    if (
+      this.isShuttingDown ||
+      this.consumerHandler === null ||
+      this.consumerReconnectTimer !== null
+    ) {
+      return;
+    }
 
-    await this.consumerChannel?.close();
-    await this.publisherChannel?.close();
-    await this.connection?.close();
+    this.logger.warn(
+      `RabbitMQ consumer reconnect scheduled in ${CONSUMER_RECONNECT_DELAY_MS}ms`,
+    );
 
-    this.consumerChannel = null;
-    this.publisherChannel = null;
-    this.connection = null;
-    this.topologyReady = false;
+    this.consumerReconnectTimer = setTimeout(() => {
+      this.consumerReconnectTimer = null;
+      void this.reconnectConsumer();
+    }, CONSUMER_RECONNECT_DELAY_MS);
+  }
+
+  private async reconnectConsumer(): Promise<void> {
+    const handler = this.consumerHandler;
+
+    if (this.isShuttingDown || handler === null) {
+      return;
+    }
+
+    try {
+      await this.startConsumer(handler);
+      this.logger.log('RabbitMQ consumer connection recovered');
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(`RabbitMQ consumer reconnect failed: ${errorMessage}`);
+
+      this.scheduleConsumerReconnect();
+    }
   }
 
   private async getConnection(): Promise<ChannelModel> {
@@ -167,13 +229,17 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     });
 
     connection.on('close', () => {
-      this.connection = null;
-      this.publisherChannel = null;
-      this.consumerChannel = null;
-      this.topologyReady = false;
+      if (this.connection === connection) {
+        this.connection = null;
+        this.publisherChannel = null;
+        this.consumerChannel = null;
+        this.topologyReady = false;
+      }
 
       if (!this.isShuttingDown) {
         this.logger.warn('RabbitMQ connection closed unexpectedly');
+
+        this.scheduleConsumerReconnect();
       }
     });
 
@@ -191,7 +257,9 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     const channel = await connection.createConfirmChannel();
 
     channel.on('close', () => {
-      this.publisherChannel = null;
+      if (this.publisherChannel === channel) {
+        this.publisherChannel = null;
+      }
     });
 
     this.publisherChannel = channel;
@@ -208,7 +276,11 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     const channel = await connection.createChannel();
 
     channel.on('close', () => {
-      this.consumerChannel = null;
+      if (this.consumerChannel === channel) {
+        this.consumerChannel = null;
+      }
+
+      this.scheduleConsumerReconnect();
     });
 
     await channel.prefetch(10);

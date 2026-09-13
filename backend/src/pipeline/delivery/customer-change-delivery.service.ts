@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+
 import { ElasticsearchService } from '../../destinations/elasticsearch/elasticsearch.service.js';
 import { RabbitMqService } from '../../destinations/rabbitmq/rabbitmq.service.js';
+import { DestinationRetryService } from '../../resilience/destination-retry.service.js';
 import type { CustomerChangeEvent } from '../contracts/customer-change-event.contract.js';
 
 @Injectable()
@@ -8,13 +10,19 @@ export class CustomerChangeDeliveryService {
   constructor(
     private readonly elasticsearchService: ElasticsearchService,
     private readonly rabbitMqService: RabbitMqService,
+    private readonly destinationRetryService: DestinationRetryService,
   ) {}
 
   async deliver(event: CustomerChangeEvent): Promise<void> {
-    await Promise.all([
-      this.deliverToElasticsearch(event),
-      this.rabbitMqService.publishCustomerChange(event),
-    ]);
+    await this.destinationRetryService.execute(
+      `Elasticsearch delivery for ${event.eventId}`,
+      () => this.deliverToElasticsearch(event),
+    );
+
+    await this.destinationRetryService.execute(
+      `RabbitMQ delivery for ${event.eventId}`,
+      () => this.rabbitMqService.publishCustomerChange(event),
+    );
   }
 
   private async deliverToElasticsearch(
@@ -22,7 +30,6 @@ export class CustomerChangeDeliveryService {
   ): Promise<void> {
     if (event.operation === 'DELETE') {
       await this.elasticsearchService.deleteCustomer(event);
-
       return;
     }
 

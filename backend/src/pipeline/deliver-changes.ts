@@ -36,7 +36,7 @@ async function deliverChanges(): Promise<void> {
     );
 
     logger.log(
-      `Delivered ${result.processedCount} changes; last processed ID: ${result.lastProcessedId}`,
+      `Processed ${result.processedCount} changes; failed: ${result.failedCount}; last processed ID: ${result.lastProcessedId}`,
     );
   } finally {
     await application.close();

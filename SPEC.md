@@ -16,6 +16,7 @@
 | 06  | Backfill და Incremental Sync პარალელურად | [specs/06-concurrent-incremental-sync.md](./specs/06-concurrent-incremental-sync.md) | Completed |
 | 07  | G2 — დუბლირებული event-ების დამუშავება   | [specs/07-duplicate-handling.md](./specs/07-duplicate-handling.md)                   | Completed |
 | 08  | G3 — Destination failure და აღდგენა      | [specs/08-destination-recovery.md](./specs/08-destination-recovery.md)               | Completed |
-| 09  | G4 — ნაწილობრივი Batch და DLQ            | [specs/09-partial-batch-and-dlq.md](./specs/09-partial-batch-and-dlq.md)             | Planned   |
+| 09  | G4 — ნაწილობრივი Batch და DLQ            | [specs/09-partial-batch-and-dlq.md](./specs/09-partial-batch-and-dlq.md)             | Completed |
+| 10  | G5 — მეტრიკები და სისტემის მდგომარეობა   | [specs/10-observability.md](./specs/10-observability.md)                             | Planned   |
 
 შემდეგი specification-ები პროექტის განვითარებასთან ერთად დაემატება.

@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+
+import { DatabaseModule } from '../database/database.module.js';
 import { RabbitMqModule } from '../destinations/rabbitmq/rabbitmq.module.js';
 import { CustomerEventConsumerService } from './customer-event-consumer.service.js';
+import { CustomerEventIdempotencyRepository } from './customer-event-idempotency.repository.js';
 
 @Module({
   imports: [
@@ -9,8 +12,9 @@ import { CustomerEventConsumerService } from './customer-event-consumer.service.
       isGlobal: true,
       envFilePath: ['../.env', '.env'],
     }),
+    DatabaseModule,
     RabbitMqModule,
   ],
-  providers: [CustomerEventConsumerService],
+  providers: [CustomerEventIdempotencyRepository, CustomerEventConsumerService],
 })
 export class CustomerEventConsumerModule {}

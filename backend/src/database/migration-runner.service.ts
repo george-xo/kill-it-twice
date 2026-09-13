@@ -2,8 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from './database.service.js';
 import { migration001 } from './migrations/001-create-source-tables.js';
 import { migration002 } from './migrations/002-create-backfill-state.js';
+import { migration003 } from './migrations/003-create-incremental-sync-state.js';
 
-const migrations = [migration001, migration002];
+const migrations = [migration001, migration002, migration003];
 @Injectable()
 export class MigrationRunnerService {
   private readonly logger = new Logger(MigrationRunnerService.name);

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+
 import { DatabaseModule } from '../database/database.module.js';
 import { PipelineModule } from '../pipeline/pipeline.module.js';
 import { BackfillCustomerRepository } from './backfill-customer.repository.js';
@@ -12,6 +13,6 @@ import { BackfillService } from './backfill.service.js';
     BackfillCustomerRepository,
     BackfillService,
   ],
-  exports: [BackfillService],
+  exports: [BackfillService, BackfillJobRepository],
 })
 export class BackfillModule {}

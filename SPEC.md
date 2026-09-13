@@ -1,10 +1,10 @@
-**# Kill It Twice — Specifications**
+# Kill It Twice — Specifications
 
 ამ დირექტორიაში ინახება თითოეული Pull Request-ის დავალება, scope და მიღებული შედეგი.
 
 ყოველი ახალი ეტაპის specification იწერება შესაბამისი კოდის დაწყებამდე. სამუშაოს დასრულების შემდეგ იმავე ფაილში ემატება მიღებული შედეგი და გეგმიდან გადახვევები.
 
-**## Specifications**
+## Specifications
 
 | PR  | თემა                                     | Specification                                                                        | სტატუსი   |
 | --- | ---------------------------------------- | ------------------------------------------------------------------------------------ | --------- |
@@ -13,6 +13,7 @@
 | 03  | Source მონაცემები და Seed                | [specs/03-source-and-seed.md](./specs/03-source-and-seed.md)                         | Completed |
 | 04  | Elasticsearch და RabbitMQ-ში მიწოდება    | [specs/04-delivery-foundation.md](./specs/04-delivery-foundation.md)                 | Completed |
 | 05  | G1 — Backfill-ის აღდგენა crash-ის შემდეგ | [specs/05-backfill-crash-recovery.md](./specs/05-backfill-crash-recovery.md)         | Completed |
-| 06  | Backfill და Incremental Sync პარალელურად | [specs/06-concurrent-incremental-sync.md](./specs/06-concurrent-incremental-sync.md) | Planned   |
+| 06  | Backfill და Incremental Sync პარალელურად | [specs/06-concurrent-incremental-sync.md](./specs/06-concurrent-incremental-sync.md) | Completed |
+| 07  | G2 — დუბლირებული event-ების დამუშავება   | [specs/07-duplicate-handling.md](./specs/07-duplicate-handling.md)                   | Planned   |
 
 შემდეგი specification-ები პროექტის განვითარებასთან ერთად დაემატება.

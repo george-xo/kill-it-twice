@@ -10,16 +10,24 @@ export class BackfillJobRepository {
     return this.databaseService.withTransaction(async (client) => {
       await client.query(
         `
-          INSERT INTO backfill_jobs (
-            name,
-            snapshot_max_id
-          )
-          SELECT
-            $1,
-            COALESCE(MAX(id), 0)
-          FROM customers
-          ON CONFLICT (name) DO NOTHING;
-        `,
+    INSERT INTO backfill_jobs (
+      name,
+      snapshot_max_id,
+      incremental_start_change_id
+    )
+    VALUES (
+      $1,
+      (
+        SELECT COALESCE(MAX(id), 0)
+        FROM customers
+      ),
+      (
+        SELECT COALESCE(MAX(id), 0)
+        FROM change_log
+      )
+    )
+    ON CONFLICT (name) DO NOTHING;
+  `,
         [name],
       );
 
@@ -29,6 +37,7 @@ export class BackfillJobRepository {
             name,
             status,
             snapshot_max_id::TEXT,
+            incremental_start_change_id::TEXT,
             last_processed_id::TEXT,
             processed_count::TEXT,
             started_at,

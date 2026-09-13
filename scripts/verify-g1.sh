@@ -20,7 +20,7 @@ pass() {
   echo "Source records .................. ${source_count}"
   echo "Elasticsearch records ........... ${elasticsearch_count}"
   echo "RabbitMQ events ................. ${rabbitmq_message_count}"
-  echo "Missing records ................. 0"
+  echo "Missing records ................. ${missing_record_count}"
 }
 
 fail() {
@@ -43,6 +43,36 @@ read_checkpoint() {
     WHERE name = '${BACKFILL_JOB_NAME}';
   " | tr -d '[:space:]'
 }
+
+count_missing_elasticsearch_records() {
+  local source_ids_json
+
+  source_ids_json="$(
+    query_postgres "
+      SELECT COALESCE(
+        json_agg(id::TEXT ORDER BY id),
+        '[]'::json
+      )::TEXT
+      FROM customers;
+    "
+  )"
+
+  curl -fsS \
+    -X POST \
+    -H 'Content-Type: application/json' \
+    --data-binary "{\"ids\":${source_ids_json}}" \
+    http://localhost:9200/customers/_mget |
+    awk -F'"found":false' '
+      {
+        missing_count += NF - 1
+      }
+
+      END {
+        print missing_count + 0
+      }
+    '
+}
+
 
 echo "Preparing G1 verification environment..."
 
@@ -207,6 +237,8 @@ elasticsearch_count="$(
     tr -d '[:space:]'
 )"
 
+missing_record_count="$(count_missing_elasticsearch_records)"
+
 rabbitmq_message_count="$(
   docker compose exec -T rabbitmq \
     rabbitmqctl list_queues name messages |
@@ -237,6 +269,14 @@ fi
 if [[ -z "${rabbitmq_message_count}" ]] ||
   ((rabbitmq_message_count < source_count)); then
   fail "RabbitMQ contains fewer events than the source record count"
+fi
+
+if [[ ! "${missing_record_count}" =~ ^[0-9]+$ ]]; then
+  fail "Missing Elasticsearch record count is invalid"
+fi
+
+if ((missing_record_count > 0)); then
+  fail "Elasticsearch is missing ${missing_record_count} source records"
 fi
 
 pass

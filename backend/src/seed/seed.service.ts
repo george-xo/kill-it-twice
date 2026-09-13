@@ -17,7 +17,11 @@ export class SeedService {
     this.validatePositiveInteger(batchSize, 'batchSize');
 
     await this.databaseService.query(`
-      TRUNCATE TABLE customers, change_log
+      TRUNCATE TABLE
+        incremental_sync_jobs,
+        backfill_jobs,
+        customers,
+        change_log
       RESTART IDENTITY;
     `);
 

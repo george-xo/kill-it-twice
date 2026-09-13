@@ -7,6 +7,7 @@ export interface BackfillJobRow extends QueryResultRow {
   status: BackfillJobStatus;
   snapshot_max_id: string;
   last_processed_id: string;
+  incremental_start_change_id: string;
   processed_count: string;
   started_at: Date | null;
   updated_at: Date;

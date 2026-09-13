@@ -167,6 +167,34 @@ services:
         condition: service_completed_successfully
     restart: 'no'
 
+  incremental-sync:
+    build:
+      context: ./backend
+    command: ['node', 'dist/incremental-sync/run-incremental-sync.js']
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: 9200
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+
+      INCREMENTAL_SYNC_BATCH_SIZE: ${INCREMENTAL_SYNC_BATCH_SIZE}
+      INCREMENTAL_SYNC_POLL_INTERVAL_MS: ${INCREMENTAL_SYNC_POLL_INTERVAL_MS}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      destination-setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   rabbitmq_data:

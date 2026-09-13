@@ -2,94 +2,92 @@
 
 ## დავალება
 
-Elasticsearch-სა და RabbitMQ consumer-ში განმეორებით მიღებული customer event-ების უსაფრთხოდ დამუშავება.
+RabbitMQ consumer-ში განმეორებით მიღებული event-ების უსაფრთხოდ დამუშავება.
 
-Pipeline იყენებს at-least-once delivery მიდგომას, ამიტომ crash-ის, retry-ის ან Backfill-ისა და Incremental Sync-ის გადაფარვის დროს ერთი event შეიძლება რამდენჯერმე გაიგზავნოს.
-
-G2-ის მიზანია განმეორებით მიღებულმა event-მა საბოლოო მდგომარეობა ან consumer-ის side effect მეორედ არ შეცვალოს.
+Pipeline იყენებს at-least-once delivery-ს, ამიტომ ერთი event შეიძლება რამდენჯერმე გაიგზავნოს. Consumer-მა ერთი event-ის შედეგი მხოლოდ ერთხელ უნდა შეინახოს.
 
 ## Scope
 
-- customer event-ის უნიკალური ID-ის გამოყენება;
-- Elasticsearch-ის version-based idempotency-ის ავტომატური შემოწმება;
-- RabbitMQ consumer-ის persistent idempotency;
-- დამუშავებული event ID-ების PostgreSQL-ში შენახვა;
-- თითოეული consumer-ისთვის event processing state-ის ცალკე შენახვა;
+- დამუშავებული event-ების PostgreSQL-ში შენახვა;
 - duplicate event-ის ამოცნობა;
 - duplicate event-ის გამოტოვება და ACK;
 - consumer restart-ის შემდეგ idempotency-ის შენარჩუნება;
-- database transaction-ის გამოყენება;
-- G2-ის ავტომატური verification;
-- `make verify-g2` ბრძანების დამატება.
+- იგივე customer-ის ახალი version-ის დამოუკიდებლად დამუშავება;
+- Seed-ის დროს consumer state-ის გასუფთავება;
+- `make verify-g2` ავტომატური შემოწმება.
 
-## Event-ის იდენტიფიკაცია
+## მუშაობის პრინციპი
 
-Customer event-ის უნიკალური ID იქმნება შემდეგი ფორმატით:
+Event-ის უნიკალური ID არის:
 
 `customer:{entityId}:{entityVersion}`
 
 მაგალითად:
 
-`customer:9001:2`
+`customer:10000:2`
 
-ერთი customer-ის ერთი version ყოველთვის ერთსა და იმავე event ID-ს ქმნის.
+დაემატა `consumer_processed_events` ცხრილი, რომლის primary key არის:
 
-## Elasticsearch
+`consumer_name + event_id`
 
-Elasticsearch-ში:
+Consumer event-ის მიღებისას ასრულებს:
 
-- customer ID გამოიყენება document ID-დ;
-- customer version გამოიყენება external version-ად;
-- იგივე ან ძველი version ახალ მდგომარეობას ვერ გადაწერს;
-- განმეორებით გაგზავნა დამატებით document-ს არ ქმნის.
+`INSERT ... ON CONFLICT DO NOTHING`
 
-## RabbitMQ Consumer
+თუ ჩანაწერი შეიქმნა, event პირველად დამუშავდა.
 
-Consumer მიღებულ event ID-ს persistent storage-ში შეამოწმებს.
+თუ primary key უკვე არსებობს, event duplicate-ია, მეორედ აღარ ინახება და RabbitMQ message ACK-დება.
 
-თუ event ჯერ არ არის დამუშავებული:
-
-1. consumer დაიწყებს database transaction-ს;
-2. შეინახავს დამუშავებულ event-ს;
-3. შეასრულებს consumer-ის side effect-ს;
-4. დაასრულებს transaction-ს;
-5. RabbitMQ-ს გაუგზავნის ACK-ს.
-
-თუ იგივე event ხელახლა მივა:
-
-1. consumer იპოვის უკვე შენახულ event ID-ს;
-2. side effect-ს მეორედ აღარ შეასრულებს;
-3. event-ს ACK-ს გაუგზავნის.
-
-თუ consumer database commit-ის შემდეგ, მაგრამ RabbitMQ ACK-მდე გაითიშება, RabbitMQ event-ს ხელახლა გამოაგზავნის. Restart-ის შემდეგ consumer persistent state-ით ამოიცნობს duplicate-ს და side effect-ს აღარ გაიმეორებს.
+Consumer-ის სახელი primary key-ის ნაწილია, რათა მომავალში სხვადასხვა consumer-მა ერთი event დამოუკიდებლად დაამუშაოს.
 
 ## წარმატების კრიტერიუმები
 
-- [ ] ერთი event-ის რამდენჯერმე გაგზავნა Elasticsearch-ში duplicate document-ს არ ქმნის;
-- [ ] ძველი version Elasticsearch-ში ახალ მდგომარეობას ვერ გადაწერს;
-- [ ] RabbitMQ consumer ერთი event ID-ის side effect-ს მხოლოდ ერთხელ ასრულებს;
-- [ ] duplicate event წარმატებით ACK-დება;
-- [ ] consumer-ის restart-ის შემდეგ დამუშავებული event-ების ისტორია არ იკარგება;
-- [ ] crash-ის შემდეგ ხელახლა მიღებული event duplicate-ად ამოიცნობა;
-- [ ] სხვადასხვა version-ის event-ები დამოუკიდებელ ცვლილებებად მუშავდება;
-- [ ] `make verify-g2` ავტომატურად ამოწმებს duplicate სცენარს;
-- [ ] Backend build და lint წარმატებით სრულდება.
-
-## ამ PR-ში არ შედის
-
-- Elasticsearch-ის ან RabbitMQ-ის გათიშვის retry policy;
-- exponential backoff;
-- retry limit;
-- ნაწილობრივ ჩავარდნილი batch;
-- DLQ;
-- poison message-ის საბოლოო დამუშავება.
-
-ეს ნაწილები შემდეგ Pull Request-ებში დაემატება.
+- [x] ერთი event persistent storage-ში მხოლოდ ერთხელ ინახება;
+- [x] duplicate event მეორედ არ მუშავდება;
+- [x] duplicate event წარმატებით ACK-დება;
+- [x] restart-ის შემდეგ idempotency state არ იკარგება;
+- [x] ახალი customer version ახალ event-ად მუშავდება;
+- [x] Seed ძველ consumer state-ს ასუფთავებს;
+- [x] Elasticsearch duplicate document-ს არ ქმნის;
+- [x] `make verify-g2` წარმატებით სრულდება;
+- [x] Backend build და lint წარმატებით სრულდება.
 
 ## შედეგი
 
-ჯერ არ არის შესრულებული.
+ტესტის დროს `customer:10000:1` event რამდენჯერმე გამოქვეყნდა.
 
-## ცვლილებები საწყის გეგმასთან შედარებით
+პირველი event დამუშავდა, ხოლო შემდეგი შეტყობინებები duplicate-ად იქნა ამოცნობილი. Consumer restart-ის შემდეგ იგივე event კვლავ duplicate-ად ჩაითვალა.
 
-ჯერ ცვლილება არ არის.
+`customer:10000:2` ახალი version იყო და წარმატებით დამუშავდა.
+
+`make verify-g2` შედეგი:
+
+- G2 duplicate handling — `PASS`;
+- ერთი event-ის გამოქვეყნების რაოდენობა — `3`;
+- უნიკალურად დამუშავებული event-ები — `2`;
+- Elasticsearch document-ები — `1`;
+- ბოლო customer version — `2`;
+- RabbitMQ pending messages — `0`.
+
+## მუშაობისას აღმოჩენილი პრობლემები და ცვლილებები
+
+- Consumer-ს PostgreSQL connection არ ჰქონდა. დაემატა `DatabaseModule`, PostgreSQL environment variables და migration dependency.
+- Consumer handler asynchronous გახდა, რათა ACK მხოლოდ database ოპერაციის დასრულების შემდეგ გაიგზავნოს.
+- Seed-ის reset-ში დაემატა `consumer_processed_events`, რათა ახალი Seed event-ები ძველ duplicate-ებად არ ჩაითვალოს.
+- `consume-customer-events` naming შენარჩუნდა, რადგან `consume` ამ entrypoint-ის მოქმედებას სწორად აღწერს.
+
+## მიმდინარე შეზღუდვა
+
+ამ ეტაპზე `consumer_processed_events` consumer-ის durable შედეგიცაა და idempotency marker-იც.
+
+თუ მომავალში დამატებითი database side effect დაემატება, ის event-ის შენახვასთან ერთად ერთ transaction-ში უნდა შესრულდეს.
+
+## ამ PR-ში არ შედის
+
+- destination failure-ის retry და backoff;
+- retry limit;
+- ნაწილობრივ ჩავარდნილი batch;
+- DLQ;
+- TypeORM integration.
+
+ეს ნაწილები შემდეგ Pull Request-ებში დაემატება.

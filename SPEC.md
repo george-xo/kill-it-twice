@@ -12,8 +12,9 @@
 | 02  | პროექტის მომზადება                       | [specs/02-project-bootstrap.md](./specs/02-project-bootstrap.md)                     | Completed |
 | 03  | Source მონაცემები და Seed                | [specs/03-source-and-seed.md](./specs/03-source-and-seed.md)                         | Completed |
 | 04  | Elasticsearch და RabbitMQ-ში მიწოდება    | [specs/04-delivery-foundation.md](./specs/04-delivery-foundation.md)                 | Completed |
-| 05  | G1 — Backfill-ის აღდგენა crash-ის შემდეგ | [specs/05-backfill-crash-recovery.md](./specs/05-backfill-crash-recovery.md)         | Completed |
+| 05  | G1 — Backfill crash recovery             | [specs/05-backfill-crash-recovery.md](./specs/05-backfill-crash-recovery.md)         | Completed |
 | 06  | Backfill და Incremental Sync პარალელურად | [specs/06-concurrent-incremental-sync.md](./specs/06-concurrent-incremental-sync.md) | Completed |
-| 07  | G2 — დუბლირებული event-ების დამუშავება   | [specs/07-duplicate-handling.md](./specs/07-duplicate-handling.md)                   | Planned   |
+| 07  | G2 — დუბლირებული event-ების დამუშავება   | [specs/07-duplicate-handling.md](./specs/07-duplicate-handling.md)                   | Completed |
+| 08  | G3 — Destination failure და აღდგენა      | [specs/08-destination-recovery.md](./specs/08-destination-recovery.md)               | Planned   |
 
 შემდეგი specification-ები პროექტის განვითარებასთან ერთად დაემატება.

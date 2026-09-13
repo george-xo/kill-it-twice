@@ -18,12 +18,13 @@ export class SeedService {
 
     await this.databaseService.query(`
       TRUNCATE TABLE
+        consumer_processed_events,
         incremental_sync_jobs,
         backfill_jobs,
         customers,
         change_log
       RESTART IDENTITY;
-    `);
+`);
 
     for (let start = 1; start <= count; start += batchSize) {
       const end = Math.min(start + batchSize - 1, count);

@@ -1,6 +1,6 @@
 COUNT ?= 1000
 
-.PHONY: seed verify-g1 verify-g2 verify-g3
+.PHONY: seed verify-g1 verify-g2 verify-g3 verify-g4
 
 seed:
 	docker compose run --rm -e SEED_COUNT=$(COUNT) backend node dist/seed/seed.js
@@ -13,3 +13,6 @@ verify-g2:
 
 verify-g3:
 	./scripts/verify-g3.sh
+
+verify-g4:
+	./scripts/verify-g4.sh

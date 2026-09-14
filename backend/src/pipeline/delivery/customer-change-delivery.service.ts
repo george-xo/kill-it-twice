@@ -4,6 +4,7 @@ import { ElasticsearchService } from '../../destinations/elasticsearch/elasticse
 import { RabbitMqService } from '../../destinations/rabbitmq/rabbitmq.service.js';
 import { DestinationRetryService } from '../../resilience/destination-retry.service.js';
 import type { CustomerChangeEvent } from '../contracts/customer-change-event.contract.js';
+import { DestinationDeliveryError } from '../errors/destination-delivery.error.js';
 
 @Injectable()
 export class CustomerChangeDeliveryService {
@@ -14,15 +15,23 @@ export class CustomerChangeDeliveryService {
   ) {}
 
   async deliver(event: CustomerChangeEvent): Promise<void> {
-    await this.destinationRetryService.execute(
-      `Elasticsearch delivery for ${event.eventId}`,
-      () => this.deliverToElasticsearch(event),
-    );
+    try {
+      await this.destinationRetryService.execute(
+        `Elasticsearch delivery for ${event.eventId}`,
+        () => this.deliverToElasticsearch(event),
+      );
+    } catch (error: unknown) {
+      throw new DestinationDeliveryError('elasticsearch', error);
+    }
 
-    await this.destinationRetryService.execute(
-      `RabbitMQ delivery for ${event.eventId}`,
-      () => this.rabbitMqService.publishCustomerChange(event),
-    );
+    try {
+      await this.destinationRetryService.execute(
+        `RabbitMQ delivery for ${event.eventId}`,
+        () => this.rabbitMqService.publishCustomerChange(event),
+      );
+    } catch (error: unknown) {
+      throw new DestinationDeliveryError('rabbitmq', error);
+    }
   }
 
   private async deliverToElasticsearch(

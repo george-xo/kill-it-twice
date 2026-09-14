@@ -13,6 +13,7 @@ import type { Channel, ChannelModel, ConfirmChannel } from 'amqplib';
 import type { CustomerChangeEvent } from '../../pipeline/contracts/customer-change-event.contract.js';
 import type { CustomerEventHandler } from '../../pipeline/contracts/customer-event-handler.contract.js';
 import { CUSTOMER_EVENTS_TOPOLOGY } from './rabbitmq-topology.definition.js';
+import { FailedCustomerChangeEvent } from '../../pipeline/contracts/failed-customer-change-event.contract.js';
 
 const CONSUMER_RECONNECT_DELAY_MS = 1_000;
 
@@ -74,14 +75,32 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
         },
       );
 
+      await channel.assertExchange(
+        CUSTOMER_EVENTS_TOPOLOGY.deadLetterExchange.name,
+        CUSTOMER_EVENTS_TOPOLOGY.deadLetterExchange.type,
+        {
+          durable: CUSTOMER_EVENTS_TOPOLOGY.deadLetterExchange.durable,
+        },
+      );
+
       await channel.assertQueue(CUSTOMER_EVENTS_TOPOLOGY.queue.name, {
         durable: CUSTOMER_EVENTS_TOPOLOGY.queue.durable,
+      });
+
+      await channel.assertQueue(CUSTOMER_EVENTS_TOPOLOGY.deadLetterQueue.name, {
+        durable: CUSTOMER_EVENTS_TOPOLOGY.deadLetterQueue.durable,
       });
 
       await channel.bindQueue(
         CUSTOMER_EVENTS_TOPOLOGY.queue.name,
         CUSTOMER_EVENTS_TOPOLOGY.exchange.name,
         CUSTOMER_EVENTS_TOPOLOGY.routingKey,
+      );
+
+      await channel.bindQueue(
+        CUSTOMER_EVENTS_TOPOLOGY.deadLetterQueue.name,
+        CUSTOMER_EVENTS_TOPOLOGY.deadLetterExchange.name,
+        CUSTOMER_EVENTS_TOPOLOGY.deadLetterRoutingKey,
       );
 
       this.topologyReady = true;
@@ -139,6 +158,37 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     this.publisherChannel = null;
     this.connection = null;
     this.topologyReady = false;
+  }
+
+  async publishFailedCustomerChange(
+    failedEvent: FailedCustomerChangeEvent,
+  ): Promise<void> {
+    await this.ensureTopology();
+
+    const channel = await this.getPublisherChannel();
+    const message = Buffer.from(JSON.stringify(failedEvent));
+
+    const accepted = channel.publish(
+      CUSTOMER_EVENTS_TOPOLOGY.deadLetterExchange.name,
+      CUSTOMER_EVENTS_TOPOLOGY.deadLetterRoutingKey,
+      message,
+      {
+        persistent: true,
+        contentType: 'application/json',
+        messageId: failedEvent.originalEvent.eventId,
+        type: 'customer.delivery.failed',
+        timestamp: Date.now(),
+        headers: {
+          failedDestination: failedEvent.failedDestination,
+        },
+      },
+    );
+
+    if (!accepted) {
+      await once(channel, 'drain');
+    }
+
+    await channel.waitForConfirms();
   }
 
   private async startConsumer(handler: CustomerEventHandler): Promise<void> {

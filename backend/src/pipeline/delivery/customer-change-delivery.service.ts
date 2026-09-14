@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 import { ElasticsearchService } from '../../destinations/elasticsearch/elasticsearch.service.js';
 import { RabbitMqService } from '../../destinations/rabbitmq/rabbitmq.service.js';
+import { PIPELINE_METRICS } from '../../observability/pipeline-metrics.constants.js';
+import { PipelineMetricsService } from '../../observability/pipeline-metrics.service.js';
 import { DestinationRetryService } from '../../resilience/destination-retry.service.js';
 import type { CustomerChangeEvent } from '../contracts/customer-change-event.contract.js';
 import { DestinationDeliveryError } from '../errors/destination-delivery.error.js';
@@ -12,13 +14,21 @@ export class CustomerChangeDeliveryService {
     private readonly elasticsearchService: ElasticsearchService,
     private readonly rabbitMqService: RabbitMqService,
     private readonly destinationRetryService: DestinationRetryService,
+    private readonly pipelineMetricsService: PipelineMetricsService,
   ) {}
 
   async deliver(event: CustomerChangeEvent): Promise<void> {
     try {
       await this.destinationRetryService.execute(
         `Elasticsearch delivery for ${event.eventId}`,
+        PIPELINE_METRICS.ELASTICSEARCH_RETRIES,
         () => this.deliverToElasticsearch(event),
+        {
+          eventId: event.eventId,
+          entityId: event.entityId,
+          version: event.entityVersion,
+          destination: 'elasticsearch',
+        },
       );
     } catch (error: unknown) {
       throw new DestinationDeliveryError('elasticsearch', error);
@@ -27,11 +37,22 @@ export class CustomerChangeDeliveryService {
     try {
       await this.destinationRetryService.execute(
         `RabbitMQ delivery for ${event.eventId}`,
+        PIPELINE_METRICS.RABBITMQ_RETRIES,
         () => this.rabbitMqService.publishCustomerChange(event),
+        {
+          eventId: event.eventId,
+          entityId: event.entityId,
+          version: event.entityVersion,
+          destination: 'rabbitmq',
+        },
       );
     } catch (error: unknown) {
       throw new DestinationDeliveryError('rabbitmq', error);
     }
+
+    await this.pipelineMetricsService.increment(
+      PIPELINE_METRICS.DELIVERED_EVENTS,
+    );
   }
 
   private async deliverToElasticsearch(

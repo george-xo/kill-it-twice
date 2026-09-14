@@ -20,6 +20,7 @@ export class SeedService {
       TRUNCATE TABLE
         consumer_processed_events,
         incremental_sync_jobs,
+        pipeline_metrics,
         backfill_jobs,
         customers,
         change_log

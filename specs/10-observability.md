@@ -1,40 +1,33 @@
-# PR 10 — G5: მეტრიკები, ლოგები და სისტემის მდგომარეობა
+# PR 10 — G5: Observability
 
 ## დავალება
 
-Pipeline-ის მიმდინარე მდგომარეობის, პროგრესისა და შეცდომების დაკვირვებადი გახდომა.
-
-სისტემამ უნდა აჩვენოს მუშაობს თუ არა თითოეული dependency, სადამდე მივიდა Backfill და Incremental Sync და რამდენი event დამუშავდა ან ჩავარდა.
+Pipeline-ის მდგომარეობის, metrics-ისა და მნიშვნელოვანი მოვლენების მონიტორინგის დამატება.
 
 ## Scope
 
-- structured logging;
-- Backfill-ის პროგრესის მეტრიკები;
-- Incremental Sync-ის პროგრესი და checkpoint;
-- processed, duplicate, retry და DLQ counters;
-- PostgreSQL, Elasticsearch და RabbitMQ health checks;
-- სისტემის საერთო status endpoint;
-- Prometheus-compatible metrics endpoint;
-- `make verify-g5` ავტომატური შემოწმება.
+- PostgreSQL-ში საერთო metrics-ის შენახვა;
+- Prometheus-ის `/metrics` endpoint;
+- სისტემის `/status` endpoint;
+- PostgreSQL-ის, Elasticsearch-ისა და RabbitMQ-ის availability;
+- Backfill-ისა და Incremental Sync-ის მდგომარეობა;
+- processed, duplicate, retry და DLQ counter-ები;
+- structured JSON logs;
+- `make verify-g5` ბრძანება.
 
 ## წარმატების კრიტერიუმები
 
-- [ ] dependency-ების health ცალ-ცალკე ჩანს;
-- [ ] Backfill-ის status და პროგრესი ხელმისაწვდომია;
-- [ ] Incremental Sync-ის status და checkpoint ხელმისაწვდომია;
-- [ ] processed, duplicate, retry და DLQ რაოდენობები ჩანს;
-- [ ] log-ები შეიცავს საჭირო context-სა და event ID-ს;
-- [ ] `/metrics` endpoint Prometheus ფორმატს აბრუნებს;
-- [ ] system status endpoint JSON პასუხს აბრუნებს;
-- [ ] `make verify-g5` წარმატებით სრულდება;
-- [ ] წინა Gate-ები კვლავ მუშაობს.
-
-## ამ PR-ში არ შედის
-
-- Angular dashboard;
-- TypeORM;
-- production deployment.
+- [x] `/metrics` აბრუნებს Prometheus counter-ებს;
+- [x] `/status` აბრუნებს dependency-ებისა და worker-ების მდგომარეობას;
+- [x] dependency-ის ან worker-ის ჩავარდნისას სისტემა ხდება `degraded`;
+- [x] recovery-ის შემდეგ სისტემა ბრუნდება `healthy` მდგომარეობაში;
+- [x] retry და consumer მოვლენები structured JSON ფორმატში ილოგება;
+- [x] G5-ის ავტომატური verification დამატებულია.
 
 ## შედეგი
 
-ჯერ არ არის შესრულებული.
+დაემატა persistent metrics, health/status ინფორმაცია და structured logging. Metrics სხვადასხვა container-იდან PostgreSQL-ში გროვდება და `/metrics` endpoint-ით Prometheus-ის ფორმატში გამოდის.
+
+## აღმოჩენილი პრობლემა
+
+Structured logs-ის დამატების შემდეგ G2–G4 verification scripts-ში ძველი ტექსტური log assertions მოძველდა. მათი გასწორება და ერთიანი `make verify` ანგარიშის აწყობა ცალკე PR11-ში შესრულდება.

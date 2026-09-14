@@ -1,17 +1,23 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { RabbitMqService } from '../destinations/rabbitmq/rabbitmq.service.js';
+import { PIPELINE_METRICS } from '../observability/pipeline-metrics.constants.js';
+import { PipelineMetricsService } from '../observability/pipeline-metrics.service.js';
+import { StructuredLogger } from '../observability/structured-logger.js';
 import type { CustomerChangeEvent } from '../pipeline/contracts/customer-change-event.contract.js';
 import { CUSTOMER_EVENT_CONSUMER_NAME } from './customer-event-consumer.constants.js';
 import { CustomerEventIdempotencyRepository } from './customer-event-idempotency.repository.js';
 
 @Injectable()
 export class CustomerEventConsumerService implements OnModuleInit {
-  private readonly logger = new Logger(CustomerEventConsumerService.name);
+  private readonly logger = new StructuredLogger(
+    CustomerEventConsumerService.name,
+  );
 
   constructor(
     private readonly rabbitMqService: RabbitMqService,
     private readonly idempotencyRepository: CustomerEventIdempotencyRepository,
+    private readonly pipelineMetricsService: PipelineMetricsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -19,7 +25,9 @@ export class CustomerEventConsumerService implements OnModuleInit {
       this.handleCustomerChange(event),
     );
 
-    this.logger.log('Waiting for customer change events');
+    this.logger.log('consumer_waiting_for_events', {
+      consumerName: CUSTOMER_EVENT_CONSUMER_NAME,
+    });
   }
 
   private async handleCustomerChange(
@@ -31,12 +39,31 @@ export class CustomerEventConsumerService implements OnModuleInit {
     );
 
     if (!isNewEvent) {
-      this.logger.log(`Duplicate event ignored: ${event.eventId}`);
+      await this.pipelineMetricsService.increment(
+        PIPELINE_METRICS.CONSUMER_DUPLICATE_EVENTS,
+      );
+
+      this.logger.log('consumer_duplicate_event_ignored', {
+        consumerName: CUSTOMER_EVENT_CONSUMER_NAME,
+        eventId: event.eventId,
+        entityId: event.entityId,
+        version: event.entityVersion,
+        operation: event.operation,
+      });
+
       return;
     }
 
-    this.logger.log(
-      `Processed event ${event.eventId}: ${event.operation} customer ${event.entityId}, version ${event.entityVersion}`,
+    await this.pipelineMetricsService.increment(
+      PIPELINE_METRICS.CONSUMER_PROCESSED_EVENTS,
     );
+
+    this.logger.log('consumer_event_processed', {
+      consumerName: CUSTOMER_EVENT_CONSUMER_NAME,
+      eventId: event.eventId,
+      entityId: event.entityId,
+      version: event.entityVersion,
+      operation: event.operation,
+    });
   }
 }

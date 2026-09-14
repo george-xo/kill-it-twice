@@ -4,8 +4,15 @@ import { migration001 } from './migrations/001-create-source-tables.js';
 import { migration002 } from './migrations/002-create-backfill-state.js';
 import { migration003 } from './migrations/003-create-incremental-sync-state.js';
 import { migration004 } from './migrations/004-create-consumer-idempotency.js';
+import { migration005 } from './migrations/005-create-pipeline-metrics.js';
 
-const migrations = [migration001, migration002, migration003, migration004];
+const migrations = [
+  migration001,
+  migration002,
+  migration003,
+  migration004,
+  migration005,
+];
 @Injectable()
 export class MigrationRunnerService {
   private readonly logger = new Logger(MigrationRunnerService.name);

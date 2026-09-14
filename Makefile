@@ -16,3 +16,6 @@ verify-g3:
 
 verify-g4:
 	./scripts/verify-g4.sh
+
+verify-g5:
+	./scripts/verify-g5.sh

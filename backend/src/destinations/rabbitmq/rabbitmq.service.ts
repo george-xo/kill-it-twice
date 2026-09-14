@@ -51,7 +51,11 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.getConnection();
+      const connection = await this.getConnection();
+      const channel = await connection.createChannel();
+
+      await channel.close();
+
       return true;
     } catch {
       return false;

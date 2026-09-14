@@ -1,8 +1,12 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import type { StructuredLogFields } from '../observability/models/structured-log.model.js';
+import type { PipelineMetricName } from '../observability/pipeline-metrics.constants.js';
+import { PipelineMetricsService } from '../observability/pipeline-metrics.service.js';
+import { StructuredLogger } from '../observability/structured-logger.js';
 import {
   DEFAULT_DESTINATION_RETRY_INITIAL_DELAY_MS,
   DEFAULT_DESTINATION_RETRY_MAX_ATTEMPTS,
@@ -14,13 +18,16 @@ import {
 
 @Injectable()
 export class DestinationRetryService implements OnModuleInit {
-  private readonly logger = new Logger(DestinationRetryService.name);
+  private readonly logger = new StructuredLogger(DestinationRetryService.name);
 
   private maxAttempts = DEFAULT_DESTINATION_RETRY_MAX_ATTEMPTS;
   private initialDelayMs = DEFAULT_DESTINATION_RETRY_INITIAL_DELAY_MS;
   private maxDelayMs = DEFAULT_DESTINATION_RETRY_MAX_DELAY_MS;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly pipelineMetricsService: PipelineMetricsService,
+  ) {}
 
   onModuleInit(): void {
     this.maxAttempts = Number(
@@ -49,7 +56,9 @@ export class DestinationRetryService implements OnModuleInit {
 
   async execute<T>(
     operationName: string,
+    retryMetricName: PipelineMetricName,
     operation: () => Promise<T>,
+    fields: StructuredLogFields = {},
   ): Promise<T> {
     let delayMs = this.initialDelayMs;
 
@@ -58,7 +67,11 @@ export class DestinationRetryService implements OnModuleInit {
         const result = await operation();
 
         if (attempt > 1) {
-          this.logger.log(`${operationName} recovered on attempt ${attempt}`);
+          this.logger.log('destination_delivery_recovered', {
+            ...fields,
+            operationName,
+            attempt,
+          });
         }
 
         return result;
@@ -67,16 +80,27 @@ export class DestinationRetryService implements OnModuleInit {
           error instanceof Error ? error.message : String(error);
 
         if (attempt === this.maxAttempts) {
-          this.logger.error(
-            `${operationName} failed after ${attempt} attempts: ${errorMessage}`,
-          );
+          this.logger.error('destination_delivery_exhausted', {
+            ...fields,
+            operationName,
+            attempt,
+            maxAttempts: this.maxAttempts,
+            error: errorMessage,
+          });
 
           throw error;
         }
 
-        this.logger.warn(
-          `${operationName} failed on attempt ${attempt}: ${errorMessage}. Retrying in ${delayMs}ms`,
-        );
+        await this.pipelineMetricsService.increment(retryMetricName);
+
+        this.logger.warn('destination_retry_scheduled', {
+          ...fields,
+          operationName,
+          attempt,
+          maxAttempts: this.maxAttempts,
+          retryDelayMs: delayMs,
+          error: errorMessage,
+        });
 
         await delay(delayMs);
 

@@ -20,13 +20,17 @@ import {
 } from './incremental-sync.constants.js';
 import { IncrementalSyncJobRepository } from './incremental-sync-job.repository.js';
 
+const INCREMENTAL_SYNC_CONTROL_POLL_INTERVAL_MS = 250;
+
 @Injectable()
 export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IncrementalSyncService.name);
 
   private batchSize = DEFAULT_INCREMENTAL_SYNC_BATCH_SIZE;
   private pollIntervalMs = DEFAULT_INCREMENTAL_SYNC_POLL_INTERVAL_MS;
-  private stopRequested = false;
+
+  private shutdownRequested = false;
+  private running = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -64,6 +68,33 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
   }
 
   async run(): Promise<void> {
+    if (this.running) {
+      throw new Error('Incremental Sync is already running');
+    }
+
+    this.running = true;
+    this.shutdownRequested = false;
+
+    try {
+      await this.executeIncrementalSync();
+    } finally {
+      this.running = false;
+    }
+  }
+
+  requestStop(): void {
+    this.shutdownRequested = true;
+  }
+
+  isRunning(): boolean {
+    return this.running;
+  }
+
+  onModuleDestroy(): void {
+    this.requestStop();
+  }
+
+  private async executeIncrementalSync(): Promise<void> {
     const backfillJob = await this.backfillJobRepository.getOrCreate(
       CUSTOMER_BACKFILL_JOB_NAME,
     );
@@ -74,22 +105,36 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
         backfillJob.incremental_start_change_id,
       );
 
-    await this.incrementalSyncJobRepository.markRunning(
-      CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
-    );
+    const stopRequested =
+      await this.incrementalSyncJobRepository.isStopRequested(
+        CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
+      );
+
+    if (stopRequested) {
+      await this.incrementalSyncJobRepository.markStopped(
+        CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
+      );
+    } else {
+      await this.incrementalSyncJobRepository.markRunning(
+        CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
+      );
+    }
 
     this.logger.log(
       `Incremental Sync started after change ID ${incrementalSyncJob.last_processed_change_id}`,
     );
 
     try {
-      await this.processChanges(incrementalSyncJob.last_processed_change_id);
+      await this.processChanges(
+        incrementalSyncJob.last_processed_change_id,
+        stopRequested,
+      );
 
       await this.incrementalSyncJobRepository.markStopped(
         CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
       );
 
-      this.logger.log('Incremental Sync stopped');
+      this.logger.log('Incremental Sync stopped during application shutdown');
     } catch (error: unknown) {
       await this.incrementalSyncJobRepository.markFailed(
         CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
@@ -100,20 +145,42 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  requestStop(): void {
-    this.stopRequested = true;
-  }
-
-  onModuleDestroy(): void {
-    this.requestStop();
-  }
-
   private async processChanges(
     initialLastProcessedChangeId: string,
+    initiallyPaused: boolean,
   ): Promise<void> {
     let lastProcessedChangeId = initialLastProcessedChangeId;
+    let paused = initiallyPaused;
 
-    while (!this.stopRequested) {
+    while (!this.shutdownRequested) {
+      const stopRequested =
+        await this.incrementalSyncJobRepository.isStopRequested(
+          CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
+        );
+
+      if (stopRequested) {
+        if (!paused) {
+          await this.incrementalSyncJobRepository.markStopped(
+            CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
+          );
+
+          this.logger.log('Incremental Sync paused by control request');
+          paused = true;
+        }
+
+        await delay(INCREMENTAL_SYNC_CONTROL_POLL_INTERVAL_MS);
+        continue;
+      }
+
+      if (paused) {
+        await this.incrementalSyncJobRepository.markRunning(
+          CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
+        );
+
+        this.logger.log('Incremental Sync resumed by control request');
+        paused = false;
+      }
+
       const result = await this.batchDeliveryService.deliverBatchAfterId(
         lastProcessedChangeId,
         this.batchSize,

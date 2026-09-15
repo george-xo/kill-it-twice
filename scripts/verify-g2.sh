@@ -11,16 +11,18 @@ RABBITMQ_QUEUE_NAME=customer.events.consumer
 CONSUMER_NAME=customer-event-consumer
 
 pass() {
-  echo "G2 duplicate handling ........... PASS"
-  echo "Published duplicate events ...... 3"
+  echo "G2 no duplicate processing ...... PASS"
+  echo "Same event publications ......... 3"
   echo "Unique processed events ......... ${processed_event_count}"
+  echo "Duplicate events detected ....... ${duplicate_event_count}"
+  echo "Duplicate processed rows ........ ${duplicate_processing_count}"
   echo "Elasticsearch documents ......... ${elasticsearch_count}"
   echo "Latest customer version ......... ${elasticsearch_version}"
   echo "RabbitMQ pending messages ....... ${rabbitmq_message_count}"
 }
 
 fail() {
-  echo "G2 duplicate handling ........... FAIL"
+  echo "G2 no duplicate processing ...... FAIL"
   echo "$1"
   exit 1
 }
@@ -37,6 +39,21 @@ read_processed_event_count() {
     SELECT COUNT(*)
     FROM consumer_processed_events
     WHERE consumer_name = '${CONSUMER_NAME}';
+  " | tr -d '[:space:]'
+}
+
+read_metric_value() {
+  local metric_name="$1"
+
+  query_postgres "
+    SELECT COALESCE(
+      (
+        SELECT value
+        FROM pipeline_metrics
+        WHERE metric_name = '${metric_name}'
+      ),
+      0
+    );
   " | tr -d '[:space:]'
 }
 
@@ -149,12 +166,14 @@ first_run_logs="$(
 
 processed_log_count="$(
   printf '%s\n' "${first_run_logs}" |
-    grep -c 'Processed event customer:1:1' || true
+    grep -F '"event":"consumer_event_processed"' |
+    grep -c '"eventId":"customer:1:1"' || true
 )"
 
 duplicate_log_count="$(
   printf '%s\n' "${first_run_logs}" |
-    grep -c 'Duplicate event ignored: customer:1:1' || true
+    grep -F '"event":"consumer_duplicate_event_ignored"' |
+    grep -c '"eventId":"customer:1:1"' || true
 )"
 
 if [[ "${processed_log_count}" != "1" ]]; then
@@ -190,7 +209,13 @@ restart_logs="$(
   docker compose logs --no-color consumer
 )"
 
-if [[ "${restart_logs}" != *"Duplicate event ignored: customer:1:1"* ]]; then
+restart_duplicate_log_count="$(
+  printf '%s\n' "${restart_logs}" |
+    grep -F '"event":"consumer_duplicate_event_ignored"' |
+    grep -c '"eventId":"customer:1:1"' || true
+)"
+
+if [[ "${restart_duplicate_log_count}" != "1" ]]; then
   fail "Duplicate event was not ignored after Consumer restart"
 fi
 
@@ -246,11 +271,48 @@ elasticsearch_version="$(
     sed -n 's/.*"_version":\([0-9][0-9]*\).*/\1/p'
 )"
 
-rabbitmq_message_count="$(read_rabbitmq_message_count)"
 processed_event_count="$(read_processed_event_count)"
+
+duplicate_event_count="$(
+  read_metric_value "consumer_duplicate_events_total"
+)"
+
+processed_metric_count="$(
+  read_metric_value "consumer_processed_events_total"
+)"
+
+duplicate_processing_count="$(
+  query_postgres "
+    SELECT COUNT(*)
+    FROM (
+      SELECT
+        consumer_name,
+        event_id
+      FROM consumer_processed_events
+      GROUP BY
+        consumer_name,
+        event_id
+      HAVING COUNT(*) > 1
+    ) AS duplicate_rows;
+  " | tr -d '[:space:]'
+)"
+
+rabbitmq_message_count="$(read_rabbitmq_message_count)"
 
 if [[ "${processed_event_count}" != "2" ]]; then
   fail "Expected 2 unique processed events"
+fi
+
+if [[ "${processed_metric_count}" != "2" ]]; then
+  fail "Processed event metric does not match the database state"
+fi
+
+if [[ "${duplicate_event_count}" != "2" ]]; then
+  fail "Expected 2 detected duplicate events"
+fi
+
+if [[ "${duplicate_processing_count}" != "0" ]]; then
+  fail "Duplicate consumer processing was detected"
 fi
 
 if [[ "${elasticsearch_count}" != "1" ]]; then

@@ -3,10 +3,11 @@
 set -euo pipefail
 
 RECORD_COUNT=10000
-BATCH_SIZE=100
+BATCH_SIZE=1000
 BATCH_DELAY_MS=500
-MINIMUM_CHECKPOINT_BEFORE_KILL=300
-MAXIMUM_WAIT_ATTEMPTS=120
+MINIMUM_CHECKPOINT_BEFORE_KILL=1000
+MINIMUM_IN_FLIGHT_EVENTS=20
+MAXIMUM_WAIT_ATTEMPTS=600
 
 POSTGRES_USER_NAME=app_user
 POSTGRES_DATABASE_NAME=kill_it_twice
@@ -14,9 +15,8 @@ BACKFILL_JOB_NAME=customers
 RABBITMQ_QUEUE_NAME=customer.events.consumer
 
 pass() {
-  echo "G1 resume after kill ............ PASS"
-  echo "Killed after checkpoint ......... ${checkpoint_before_kill}"
-  echo "Resumed from checkpoint ......... ${checkpoint_before_kill}"
+  echo "G1 resume after kill ............ PASS (killed at ${killed_at}, resumed at ${resume_checkpoint}, ${lost_record_count} lost)"
+  echo "Replayed events ................. ${replayed_event_count}"
   echo "Source records .................. ${source_count}"
   echo "Elasticsearch records ........... ${elasticsearch_count}"
   echo "RabbitMQ events ................. ${rabbitmq_message_count}"
@@ -42,6 +42,14 @@ read_checkpoint() {
     FROM backfill_jobs
     WHERE name = '${BACKFILL_JOB_NAME}';
   " | tr -d '[:space:]'
+}
+
+read_rabbitmq_message_count() {
+  docker compose exec -T rabbitmq \
+    rabbitmqctl list_queues name messages_ready 2>/dev/null |
+    awk -v queue="${RABBITMQ_QUEUE_NAME}" \
+      '$1 == queue { print $2 }' |
+    tr -d '[:space:]'
 }
 
 count_missing_elasticsearch_records() {
@@ -73,12 +81,18 @@ count_missing_elasticsearch_records() {
     '
 }
 
-
 echo "Preparing G1 verification environment..."
 
-docker compose stop consumer backfill >/dev/null 2>&1 || true
+docker compose stop \
+  consumer \
+  incremental-sync \
+  backfill \
+  >/dev/null 2>&1 || true
 
-docker compose up -d --wait postgres rabbitmq elasticsearch
+docker compose up -d --wait \
+  postgres \
+  rabbitmq \
+  elasticsearch
 
 docker compose build \
   migrate \
@@ -86,12 +100,13 @@ docker compose build \
   destination-setup \
   backfill
 
-docker compose run --rm migrate
+docker compose run --rm migrate >/dev/null
 
 docker compose run --rm \
   -e SEED_COUNT="${RECORD_COUNT}" \
   backend \
-  node dist/seed/seed.js
+  node dist/seed/seed.js \
+  >/dev/null
 
 query_postgres "
   DELETE FROM backfill_jobs
@@ -103,7 +118,7 @@ curl -sS \
   http://localhost:9200/customers \
   >/dev/null || true
 
-docker compose run --rm destination-setup
+docker compose run --rm destination-setup >/dev/null
 
 docker compose exec -T rabbitmq \
   rabbitmqctl purge_queue "${RABBITMQ_QUEUE_NAME}" \
@@ -117,15 +132,20 @@ docker compose up \
   -d \
   --no-deps \
   --force-recreate \
-  backfill
+  backfill \
+  >/dev/null
 
 checkpoint_before_kill=""
+published_before_kill=""
 
 for ((attempt = 1; attempt <= MAXIMUM_WAIT_ATTEMPTS; attempt += 1)); do
   checkpoint_before_kill="$(read_checkpoint)"
+  published_before_kill="$(read_rabbitmq_message_count)"
 
   if [[ "${checkpoint_before_kill}" =~ ^[0-9]+$ ]] &&
-    ((checkpoint_before_kill >= MINIMUM_CHECKPOINT_BEFORE_KILL)); then
+    [[ "${published_before_kill}" =~ ^[0-9]+$ ]] &&
+    ((checkpoint_before_kill >= MINIMUM_CHECKPOINT_BEFORE_KILL)) &&
+    ((published_before_kill >= checkpoint_before_kill + MINIMUM_IN_FLIGHT_EVENTS)); then
     break
   fi
 
@@ -133,15 +153,17 @@ for ((attempt = 1; attempt <= MAXIMUM_WAIT_ATTEMPTS; attempt += 1)); do
 done
 
 if [[ ! "${checkpoint_before_kill}" =~ ^[0-9]+$ ]] ||
-  ((checkpoint_before_kill < MINIMUM_CHECKPOINT_BEFORE_KILL)); then
-  fail "Backfill did not reach the required checkpoint before timeout"
+  [[ ! "${published_before_kill}" =~ ^[0-9]+$ ]]; then
+  fail "Backfill progress could not be read"
 fi
 
-if ((checkpoint_before_kill >= RECORD_COUNT)); then
-  fail "Backfill completed before it could be killed"
+if ((checkpoint_before_kill < MINIMUM_CHECKPOINT_BEFORE_KILL)); then
+  fail "Backfill did not reach the minimum checkpoint"
 fi
 
-echo "Killing Backfill at checkpoint ${checkpoint_before_kill}..."
+if ((published_before_kill < checkpoint_before_kill + MINIMUM_IN_FLIGHT_EVENTS)); then
+  fail "Backfill was not observed in the middle of a batch"
+fi
 
 backfill_container_id="$(docker compose ps -q backfill)"
 
@@ -149,12 +171,24 @@ if [[ -z "${backfill_container_id}" ]]; then
   fail "Backfill container was not found"
 fi
 
+echo "Killing Backfill during an unfinished batch..."
+
 docker kill "${backfill_container_id}" >/dev/null
 
-stored_checkpoint_after_kill="$(read_checkpoint)"
+killed_at="$(read_rabbitmq_message_count)"
+resume_checkpoint="$(read_checkpoint)"
 
-if [[ "${stored_checkpoint_after_kill}" != "${checkpoint_before_kill}" ]]; then
-  fail "Stored checkpoint changed after docker kill"
+if [[ ! "${killed_at}" =~ ^[0-9]+$ ]] ||
+  [[ ! "${resume_checkpoint}" =~ ^[0-9]+$ ]]; then
+  fail "Kill position or resume checkpoint is invalid"
+fi
+
+if ((killed_at <= resume_checkpoint)); then
+  fail "Backfill was not killed after the persisted checkpoint"
+fi
+
+if ((resume_checkpoint >= RECORD_COUNT)); then
+  fail "Backfill completed before it could be killed"
 fi
 
 backfill_status_after_kill="$(
@@ -166,10 +200,10 @@ backfill_status_after_kill="$(
 )"
 
 if [[ "${backfill_status_after_kill}" != "running" ]]; then
-  fail "Expected job status running after docker kill, got ${backfill_status_after_kill}"
+  fail "Expected running status after kill, got ${backfill_status_after_kill}"
 fi
 
-echo "Restarting Backfill..."
+echo "Restarting Backfill from checkpoint ${resume_checkpoint}..."
 
 docker compose start backfill >/dev/null
 
@@ -181,8 +215,8 @@ resume_log="$(
     tail -n 1
 )"
 
-if [[ "${resume_log}" != *"customer ID ${checkpoint_before_kill};"* ]]; then
-  fail "Backfill did not resume from checkpoint ${checkpoint_before_kill}"
+if [[ "${resume_log}" != *"customer ID ${resume_checkpoint};"* ]]; then
+  fail "Backfill did not resume from checkpoint ${resume_checkpoint}"
 fi
 
 docker compose wait backfill >/dev/null
@@ -237,14 +271,23 @@ elasticsearch_count="$(
     tr -d '[:space:]'
 )"
 
-missing_record_count="$(count_missing_elasticsearch_records)"
+missing_record_count="$(
+  count_missing_elasticsearch_records
+)"
 
 rabbitmq_message_count="$(
-  docker compose exec -T rabbitmq \
-    rabbitmqctl list_queues name messages |
-    awk -v queue="${RABBITMQ_QUEUE_NAME}" '$1 == queue { print $2 }' |
-    tr -d '[:space:]'
+  read_rabbitmq_message_count
 )"
+
+replayed_event_count="$(
+  expr "${rabbitmq_message_count}" - "${source_count}"
+)"
+
+expected_replayed_event_count="$(
+  expr "${killed_at}" - "${resume_checkpoint}"
+)"
+
+lost_record_count="${missing_record_count}"
 
 if [[ "${final_status}" != "completed" ]]; then
   fail "Expected final status completed, got ${final_status}"
@@ -266,17 +309,12 @@ if [[ "${elasticsearch_count}" != "${source_count}" ]]; then
   fail "Elasticsearch count does not match source count"
 fi
 
-if [[ -z "${rabbitmq_message_count}" ]] ||
-  ((rabbitmq_message_count < source_count)); then
-  fail "RabbitMQ contains fewer events than the source record count"
+if [[ "${missing_record_count}" != "0" ]]; then
+  fail "Elasticsearch is missing ${missing_record_count} records"
 fi
 
-if [[ ! "${missing_record_count}" =~ ^[0-9]+$ ]]; then
-  fail "Missing Elasticsearch record count is invalid"
-fi
-
-if ((missing_record_count > 0)); then
-  fail "Elasticsearch is missing ${missing_record_count} source records"
+if [[ "${replayed_event_count}" != "${expected_replayed_event_count}" ]]; then
+  fail "Replay count does not match unfinished batch progress"
 fi
 
 pass

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { DatabaseService } from '../database/database.service.js';
 
 const DEFAULT_BATCH_SIZE = 5_000;
@@ -16,6 +17,8 @@ export class SeedService {
     this.validatePositiveInteger(count, 'count');
     this.validatePositiveInteger(batchSize, 'batchSize');
 
+    await this.resetSimulationState();
+
     await this.databaseService.query(`
       TRUNCATE TABLE
         consumer_processed_events,
@@ -25,7 +28,7 @@ export class SeedService {
         customers,
         change_log
       RESTART IDENTITY;
-`);
+    `);
 
     for (let start = 1; start <= count; start += batchSize) {
       const end = Math.min(start + batchSize - 1, count);
@@ -34,6 +37,17 @@ export class SeedService {
 
       this.logger.log(`Seeded ${end}/${count} customers`);
     }
+  }
+
+  private async resetSimulationState(): Promise<void> {
+    await this.databaseService.query(`
+      UPDATE pipeline_simulation_state
+      SET
+        elasticsearch_failure_enabled = FALSE,
+        rabbitmq_failure_enabled = FALSE,
+        updated_at = NOW()
+      WHERE name = 'global';
+    `);
   }
 
   private async insertBatch(start: number, end: number): Promise<void> {

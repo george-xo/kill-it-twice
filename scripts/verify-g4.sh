@@ -3,7 +3,12 @@
 set -euo pipefail
 
 RECORD_COUNT=10
-MAXIMUM_WAIT_ATTEMPTS=120
+BATCH_RECORD_COUNT=500
+FAILED_RECORD_COUNT=3
+SUCCESSFUL_RECORD_COUNT="$(
+  expr "${BATCH_RECORD_COUNT}" - "${FAILED_RECORD_COUNT}"
+)"
+MAXIMUM_WAIT_ATTEMPTS=600
 
 POSTGRES_USER_NAME=app_user
 POSTGRES_DATABASE_NAME=kill_it_twice
@@ -13,7 +18,7 @@ MAIN_QUEUE_NAME=customer.events.consumer
 DEAD_LETTER_QUEUE_NAME=customer.events.dlq
 
 pass() {
-  echo "G4 partial batch and DLQ ........ PASS"
+  echo "G4 partial batch failure ........ PASS (${successful_document_count} written, ${dead_letter_queue_count} in DLQ)"
   echo "Processed batch records ......... ${processed_count}"
   echo "Successful Elasticsearch docs ... ${successful_document_count}"
   echo "Failed Elasticsearch docs ....... ${failed_document_count}"
@@ -23,7 +28,7 @@ pass() {
 }
 
 fail() {
-  echo "G4 partial batch and DLQ ........ FAIL"
+  echo "G4 partial batch failure ........ FAIL"
   echo "$1"
   exit 1
 }
@@ -51,6 +56,21 @@ read_queue_count() {
     awk -v queue="${queue_name}" \
       '$1 == queue { print $2 }' |
     tr -d '[:space:]'
+}
+
+read_metric_value() {
+  local metric_name="$1"
+
+  query_postgres "
+    SELECT COALESCE(
+      (
+        SELECT value
+        FROM pipeline_metrics
+        WHERE metric_name = '${metric_name}'
+      ),
+      0
+    );
+  " | tr -d '[:space:]'
 }
 
 wait_for_checkpoint() {
@@ -112,6 +132,7 @@ docker compose exec -T rabbitmq \
   rabbitmqctl purge_queue "${DEAD_LETTER_QUEUE_NAME}" \
   >/dev/null
 
+INCREMENTAL_SYNC_BATCH_SIZE="${BATCH_RECORD_COUNT}" \
 DESTINATION_RETRY_MAX_ATTEMPTS=2 \
 DESTINATION_RETRY_INITIAL_DELAY_MS=50 \
 DESTINATION_RETRY_MAX_DELAY_MS=50 \
@@ -131,55 +152,33 @@ query_postgres "
     operation,
     payload
   )
-  VALUES
-  (
-    900001,
+  SELECT
+    900000 + generated_number,
     1,
     'INSERT',
     jsonb_build_object(
-      'id', 900001,
-      'name', 'Valid Customer 1',
-      'email', 'valid900001@example.com',
-      'status', 'active',
+      'id', 900000 + generated_number,
+      'name', 'Batch Customer ' || generated_number,
+      'email',
+        'batch-customer-' || generated_number || '@example.com',
+      'status',
+        CASE
+          WHEN generated_number IN (100, 250, 400)
+            THEN jsonb_build_object('invalid', true)
+          ELSE to_jsonb('active'::TEXT)
+        END,
       'attributes', '{}'::jsonb,
       'version', 1,
       'created_at', NOW(),
       'updated_at', NOW()
     )
-  ),
-  (
-    900002,
+  FROM generate_series(
     1,
-    'INSERT',
-    jsonb_build_object(
-      'id', 900002,
-      'name', 'Poison Customer',
-      'email', 'poison900002@example.com',
-      'status', jsonb_build_object('invalid', true),
-      'attributes', '{}'::jsonb,
-      'version', 1,
-      'created_at', NOW(),
-      'updated_at', NOW()
-    )
-  ),
-  (
-    900003,
-    1,
-    'INSERT',
-    jsonb_build_object(
-      'id', 900003,
-      'name', 'Valid Customer 2',
-      'email', 'valid900003@example.com',
-      'status', 'active',
-      'attributes', '{}'::jsonb,
-      'version', 1,
-      'created_at', NOW(),
-      'updated_at', NOW()
-    )
-  );
+    ${BATCH_RECORD_COUNT}
+  ) AS generated(generated_number);
 " >/dev/null
 
-expected_checkpoint="$((RECORD_COUNT + 3))"
+expected_checkpoint="$((RECORD_COUNT + BATCH_RECORD_COUNT))"
 
 wait_for_checkpoint "${expected_checkpoint}"
 
@@ -188,26 +187,51 @@ curl -fsS \
   http://localhost:9200/customers/_refresh \
   >/dev/null
 
+test_entity_ids="$(
+  query_postgres "
+    SELECT json_agg(
+      (900000 + generated_number)::TEXT
+      ORDER BY generated_number
+    )::TEXT
+    FROM generate_series(
+      1,
+      ${BATCH_RECORD_COUNT}
+    ) AS generated(generated_number);
+  "
+)"
+
 documents="$(
   curl -fsS \
     -H 'Content-Type: application/json' \
     -X POST \
     http://localhost:9200/customers/_mget \
-    -d '{"ids":["900001","900002","900003"]}'
+    --data-binary "{\"ids\":${test_entity_ids}}"
 )"
 
 successful_document_count="$(
   printf '%s\n' "${documents}" |
-    grep -o '"found":true' |
-    wc -l |
-    tr -d '[:space:]'
+    awk -F'"found":true' '
+      {
+        found_count += NF - 1
+      }
+
+      END {
+        print found_count + 0
+      }
+    '
 )"
 
 failed_document_count="$(
   printf '%s\n' "${documents}" |
-    grep -o '"found":false' |
-    wc -l |
-    tr -d '[:space:]'
+    awk -F'"found":false' '
+      {
+        missing_count += NF - 1
+      }
+
+      END {
+        print missing_count + 0
+      }
+    '
 )"
 
 main_queue_count="$(read_queue_count "${MAIN_QUEUE_NAME}")"
@@ -226,36 +250,58 @@ processed_count="$(
   " | tr -d '[:space:]'
 )"
 
+delivered_metric_count="$(
+  read_metric_value "pipeline_delivered_events_total"
+)"
+
+dead_letter_metric_count="$(
+  read_metric_value "pipeline_dead_letter_events_total"
+)"
+
 incremental_logs="$(
   docker compose logs --no-color incremental-sync
 )"
 
-if [[ "${successful_document_count}" != "2" ]]; then
-  fail "Expected 2 successful Elasticsearch documents"
+dead_letter_log_count="$(
+  printf '%s\n' "${incremental_logs}" |
+    grep -F '"event":"customer_change_sent_to_dlq"' |
+    grep -c '"failedDestination":"elasticsearch"' || true
+)"
+
+if [[ "${successful_document_count}" != "${SUCCESSFUL_RECORD_COUNT}" ]]; then
+  fail "Expected ${SUCCESSFUL_RECORD_COUNT} successful documents"
 fi
 
-if [[ "${failed_document_count}" != "1" ]]; then
-  fail "Expected 1 failed Elasticsearch document"
+if [[ "${failed_document_count}" != "${FAILED_RECORD_COUNT}" ]]; then
+  fail "Expected ${FAILED_RECORD_COUNT} failed documents"
 fi
 
-if [[ "${main_queue_count}" != "2" ]]; then
-  fail "Expected 2 messages in the main queue"
+if [[ "${main_queue_count}" != "${SUCCESSFUL_RECORD_COUNT}" ]]; then
+  fail "Expected ${SUCCESSFUL_RECORD_COUNT} main queue messages"
 fi
 
-if [[ "${dead_letter_queue_count}" != "1" ]]; then
-  fail "Expected 1 message in the DLQ"
+if [[ "${dead_letter_queue_count}" != "${FAILED_RECORD_COUNT}" ]]; then
+  fail "Expected ${FAILED_RECORD_COUNT} DLQ messages"
 fi
 
 if [[ "${final_checkpoint}" != "${expected_checkpoint}" ]]; then
-  fail "Checkpoint did not move past the failed event"
+  fail "Checkpoint did not move past the complete batch"
 fi
 
-if [[ "${processed_count}" != "3" ]]; then
-  fail "Expected 3 processed batch records"
+if [[ "${processed_count}" != "${BATCH_RECORD_COUNT}" ]]; then
+  fail "Expected ${BATCH_RECORD_COUNT} processed batch records"
 fi
 
-if [[ "${incremental_logs}" != *"Event customer:900002:1 sent to DLQ"* ]]; then
-  fail "DLQ delivery was not logged"
+if [[ "${delivered_metric_count}" != "${SUCCESSFUL_RECORD_COUNT}" ]]; then
+  fail "Delivered metric does not match successful records"
+fi
+
+if [[ "${dead_letter_metric_count}" != "${FAILED_RECORD_COUNT}" ]]; then
+  fail "DLQ metric does not match failed records"
+fi
+
+if [[ "${dead_letter_log_count}" != "${FAILED_RECORD_COUNT}" ]]; then
+  fail "Expected ${FAILED_RECORD_COUNT} structured DLQ logs"
 fi
 
 pass

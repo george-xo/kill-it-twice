@@ -1,6 +1,7 @@
 import type { QueryResultRow } from 'pg';
 
-export type BackfillJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type BackfillJobStatus =
+  'pending' | 'running' | 'stopped' | 'completed' | 'failed';
 
 export interface BackfillJobRow extends QueryResultRow {
   name: string;

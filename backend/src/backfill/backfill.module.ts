@@ -13,6 +13,6 @@ import { BackfillService } from './backfill.service.js';
     BackfillCustomerRepository,
     BackfillService,
   ],
-  exports: [BackfillService, BackfillJobRepository],
+  exports: [BackfillJobRepository, BackfillService],
 })
 export class BackfillModule {}

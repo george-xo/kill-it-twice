@@ -5,6 +5,7 @@ import { RabbitMqService } from '../../destinations/rabbitmq/rabbitmq.service.js
 import { PIPELINE_METRICS } from '../../observability/pipeline-metrics.constants.js';
 import { PipelineMetricsService } from '../../observability/pipeline-metrics.service.js';
 import { DestinationRetryService } from '../../resilience/destination-retry.service.js';
+import { SimulationService } from '../../simulation/simulation.service.js';
 import type { CustomerChangeEvent } from '../contracts/customer-change-event.contract.js';
 import { DestinationDeliveryError } from '../errors/destination-delivery.error.js';
 
@@ -15,6 +16,7 @@ export class CustomerChangeDeliveryService {
     private readonly rabbitMqService: RabbitMqService,
     private readonly destinationRetryService: DestinationRetryService,
     private readonly pipelineMetricsService: PipelineMetricsService,
+    private readonly simulationService: SimulationService,
   ) {}
 
   async deliver(event: CustomerChangeEvent): Promise<void> {
@@ -22,7 +24,13 @@ export class CustomerChangeDeliveryService {
       await this.destinationRetryService.execute(
         `Elasticsearch delivery for ${event.eventId}`,
         PIPELINE_METRICS.ELASTICSEARCH_RETRIES,
-        () => this.deliverToElasticsearch(event),
+        async () => {
+          await this.simulationService.assertDestinationAvailable(
+            'elasticsearch',
+          );
+
+          await this.deliverToElasticsearch(event);
+        },
         {
           eventId: event.eventId,
           entityId: event.entityId,
@@ -38,7 +46,11 @@ export class CustomerChangeDeliveryService {
       await this.destinationRetryService.execute(
         `RabbitMQ delivery for ${event.eventId}`,
         PIPELINE_METRICS.RABBITMQ_RETRIES,
-        () => this.rabbitMqService.publishCustomerChange(event),
+        async () => {
+          await this.simulationService.assertDestinationAvailable('rabbitmq');
+
+          await this.rabbitMqService.publishCustomerChange(event);
+        },
         {
           eventId: event.eventId,
           entityId: event.entityId,

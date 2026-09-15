@@ -1,5 +1,13 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { setTimeout as delay } from 'node:timers/promises';
+
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+
 import { CustomerChangeDeliveryService } from '../pipeline/delivery/customer-change-delivery.service.js';
 import {
   BACKFILL_BATCH_DELAY_MS_CONFIG_KEY,
@@ -10,15 +18,19 @@ import {
 } from './backfill.constants.js';
 import { BackfillCustomerRepository } from './backfill-customer.repository.js';
 import { BackfillJobRepository } from './backfill-job.repository.js';
-import { setTimeout as delay } from 'node:timers/promises';
 import { mapBackfillCustomerToEvent } from './mappers/backfill-customer-event.mapper.js';
 
+const BACKFILL_CONTROL_POLL_INTERVAL_MS = 250;
+
 @Injectable()
-export class BackfillService implements OnModuleInit {
+export class BackfillService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BackfillService.name);
 
   private batchSize = DEFAULT_BACKFILL_BATCH_SIZE;
   private batchDelayMs = DEFAULT_BACKFILL_BATCH_DELAY_MS;
+
+  private shutdownRequested = false;
+  private running = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -56,6 +68,33 @@ export class BackfillService implements OnModuleInit {
   }
 
   async run(): Promise<void> {
+    if (this.running) {
+      throw new Error('Backfill is already running');
+    }
+
+    this.running = true;
+    this.shutdownRequested = false;
+
+    try {
+      await this.executeBackfill();
+    } finally {
+      this.running = false;
+    }
+  }
+
+  requestStop(): void {
+    this.shutdownRequested = true;
+  }
+
+  isRunning(): boolean {
+    return this.running;
+  }
+
+  onModuleDestroy(): void {
+    this.requestStop();
+  }
+
+  private async executeBackfill(): Promise<void> {
     const job = await this.backfillJobRepository.getOrCreate(
       CUSTOMER_BACKFILL_JOB_NAME,
     );
@@ -75,7 +114,26 @@ export class BackfillService implements OnModuleInit {
     );
 
     try {
-      await this.processBatches(job.last_processed_id, job.snapshot_max_id);
+      const completed = await this.processBatches(
+        job.last_processed_id,
+        job.snapshot_max_id,
+      );
+
+      if (completed) {
+        await this.backfillJobRepository.markCompleted(
+          CUSTOMER_BACKFILL_JOB_NAME,
+        );
+
+        this.logger.log(
+          `Backfill completed at snapshot max ID ${job.snapshot_max_id}`,
+        );
+
+        return;
+      }
+
+      await this.backfillJobRepository.markStopped(CUSTOMER_BACKFILL_JOB_NAME);
+
+      this.logger.log('Backfill stopped during application shutdown');
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -92,10 +150,38 @@ export class BackfillService implements OnModuleInit {
   private async processBatches(
     initialLastProcessedId: string,
     snapshotMaxId: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     let lastProcessedId = initialLastProcessedId;
+    let paused = false;
 
-    while (true) {
+    while (!this.shutdownRequested) {
+      const stopRequested = await this.backfillJobRepository.isStopRequested(
+        CUSTOMER_BACKFILL_JOB_NAME,
+      );
+
+      if (stopRequested) {
+        if (!paused) {
+          await this.backfillJobRepository.markStopped(
+            CUSTOMER_BACKFILL_JOB_NAME,
+          );
+
+          this.logger.log('Backfill paused by control request');
+          paused = true;
+        }
+
+        await delay(BACKFILL_CONTROL_POLL_INTERVAL_MS);
+        continue;
+      }
+
+      if (paused) {
+        await this.backfillJobRepository.markRunning(
+          CUSTOMER_BACKFILL_JOB_NAME,
+        );
+
+        this.logger.log('Backfill resumed by control request');
+        paused = false;
+      }
+
       const customers = await this.backfillCustomerRepository.findBatch(
         lastProcessedId,
         snapshotMaxId,
@@ -103,15 +189,7 @@ export class BackfillService implements OnModuleInit {
       );
 
       if (customers.length === 0) {
-        await this.backfillJobRepository.markCompleted(
-          CUSTOMER_BACKFILL_JOB_NAME,
-        );
-
-        this.logger.log(
-          `Backfill completed at snapshot max ID ${snapshotMaxId}`,
-        );
-
-        return;
+        return true;
       }
 
       for (const customer of customers) {
@@ -120,7 +198,7 @@ export class BackfillService implements OnModuleInit {
         await this.customerChangeDeliveryService.deliver(event);
       }
 
-      const lastCustomer = customers[customers.length - 1];
+      const lastCustomer = customers.at(-1);
 
       if (!lastCustomer) {
         throw new Error('Backfill batch has no last customer');
@@ -142,5 +220,7 @@ export class BackfillService implements OnModuleInit {
         await delay(this.batchDelayMs);
       }
     }
+
+    return false;
   }
 }

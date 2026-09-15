@@ -18,6 +18,7 @@
 | 08  | G3 — Destination failure და აღდგენა      | [specs/08-destination-recovery.md](./specs/08-destination-recovery.md)               | Completed |
 | 09  | G4 — ნაწილობრივი Batch და DLQ            | [specs/09-partial-batch-and-dlq.md](./specs/09-partial-batch-and-dlq.md)             | Completed |
 | 10  | G5 — მეტრიკები და სისტემის მდგომარეობა   | [specs/10-observability.md](./specs/10-observability.md)                             | Completed |
-| 11  | G1–G5 საბოლოო Verification               | [specs/11-verification-harness.md](./specs/11-verification-harness.md)               | Planned   |
+| 11  | G1–G5 საბოლოო Verification               | [specs/11-verification-harness.md](./specs/11-verification-harness.md)               | Completed |
+| 12  | Angular Control Panel                    | [specs/12-angular-control-panel.md](./specs/12-angular-control-panel.md)             | Planned   |
 
 შემდეგი specification-ები პროექტის განვითარებასთან ერთად დაემატება.

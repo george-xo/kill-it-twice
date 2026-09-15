@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import type { QueryResultRow } from 'pg';
 
 import { DatabaseService } from '../database/database.service.js';
 import type { IncrementalSyncJobRow } from './models/incremental-sync-job.model.js';
+
+interface StopRequestedRow extends QueryResultRow {
+  stop_requested: boolean;
+}
 
 @Injectable()
 export class IncrementalSyncJobRepository {
@@ -54,6 +59,59 @@ export class IncrementalSyncJobRepository {
 
       return job;
     });
+  }
+
+  async requestStart(name: string): Promise<void> {
+    const result = await this.databaseService.query(
+      `
+        UPDATE incremental_sync_jobs
+        SET
+          stop_requested = FALSE,
+          updated_at = NOW()
+        WHERE name = $1
+        RETURNING name;
+      `,
+      [name],
+    );
+
+    if (result.rowCount !== 1) {
+      throw new Error(
+        `Incremental sync job "${name}" cannot accept a start request`,
+      );
+    }
+  }
+
+  async requestStop(name: string): Promise<void> {
+    const result = await this.databaseService.query(
+      `
+        UPDATE incremental_sync_jobs
+        SET
+          stop_requested = TRUE,
+          updated_at = NOW()
+        WHERE name = $1
+        RETURNING name;
+      `,
+      [name],
+    );
+
+    if (result.rowCount !== 1) {
+      throw new Error(
+        `Incremental sync job "${name}" cannot accept a stop request`,
+      );
+    }
+  }
+
+  async isStopRequested(name: string): Promise<boolean> {
+    const result = await this.databaseService.query<StopRequestedRow>(
+      `
+          SELECT stop_requested
+          FROM incremental_sync_jobs
+          WHERE name = $1;
+        `,
+      [name],
+    );
+
+    return result.rows[0]?.stop_requested ?? false;
   }
 
   async markRunning(name: string): Promise<void> {

@@ -9,6 +9,6 @@ import { IncrementalSyncService } from './incremental-sync.service.js';
 @Module({
   imports: [DatabaseModule, BackfillModule, PipelineModule],
   providers: [IncrementalSyncJobRepository, IncrementalSyncService],
-  exports: [IncrementalSyncService],
+  exports: [IncrementalSyncJobRepository, IncrementalSyncService],
 })
 export class IncrementalSyncModule {}

@@ -11,9 +11,13 @@ import * as amqp from 'amqplib';
 import type { Channel, ChannelModel, ConfirmChannel } from 'amqplib';
 
 import type { CustomerChangeEvent } from '../../pipeline/contracts/customer-change-event.contract.js';
+import type {
+  DeadLetterReplayResult,
+  FailedCustomerChangeHandler,
+} from '../../pipeline/contracts/dead-letter-replay.contract.js';
 import type { CustomerEventHandler } from '../../pipeline/contracts/customer-event-handler.contract.js';
+import type { FailedCustomerChangeEvent } from '../../pipeline/contracts/failed-customer-change-event.contract.js';
 import { CUSTOMER_EVENTS_TOPOLOGY } from './rabbitmq-topology.definition.js';
-import { FailedCustomerChangeEvent } from '../../pipeline/contracts/failed-customer-change-event.contract.js';
 
 const CONSUMER_RECONNECT_DELAY_MS = 1_000;
 
@@ -37,16 +41,32 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     const host = this.configService.getOrThrow<string>('RABBITMQ_HOST');
-
     const port = this.configService.getOrThrow<string>('RABBITMQ_PORT');
-
     const username = this.configService.getOrThrow<string>('RABBITMQ_USER');
-
     const password = this.configService.getOrThrow<string>('RABBITMQ_PASSWORD');
 
     this.connectionUrl =
       `amqp://${encodeURIComponent(username)}:` +
       `${encodeURIComponent(password)}@${host}:${port}`;
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.isShuttingDown = true;
+    this.consumerHandler = null;
+
+    if (this.consumerReconnectTimer !== null) {
+      clearTimeout(this.consumerReconnectTimer);
+      this.consumerReconnectTimer = null;
+    }
+
+    await this.consumerChannel?.close();
+    await this.publisherChannel?.close();
+    await this.connection?.close();
+
+    this.consumerChannel = null;
+    this.publisherChannel = null;
+    this.connection = null;
+    this.topologyReady = false;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -113,6 +133,101 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async getCustomerQueueMessageCounts(): Promise<{
+    mainQueue: number;
+    deadLetterQueue: number;
+  }> {
+    await this.ensureTopology();
+
+    const connection = await this.getConnection();
+    const channel = await connection.createChannel();
+
+    try {
+      const mainQueue = await channel.checkQueue(
+        CUSTOMER_EVENTS_TOPOLOGY.queue.name,
+      );
+
+      const deadLetterQueue = await channel.checkQueue(
+        CUSTOMER_EVENTS_TOPOLOGY.deadLetterQueue.name,
+      );
+
+      return {
+        mainQueue: mainQueue.messageCount,
+        deadLetterQueue: deadLetterQueue.messageCount,
+      };
+    } finally {
+      await channel.close();
+    }
+  }
+
+  async replayFailedCustomerChanges(
+    limit: number,
+    handler: FailedCustomerChangeHandler,
+  ): Promise<DeadLetterReplayResult> {
+    await this.ensureTopology();
+
+    const connection = await this.getConnection();
+    const channel = await connection.createChannel();
+
+    let processed = 0;
+    let replayed = 0;
+    let failed = 0;
+
+    try {
+      while (processed < limit) {
+        const message = await channel.get(
+          CUSTOMER_EVENTS_TOPOLOGY.deadLetterQueue.name,
+          {
+            noAck: false,
+          },
+        );
+
+        if (message === false) {
+          break;
+        }
+
+        processed += 1;
+
+        try {
+          const failedEvent = JSON.parse(
+            message.content.toString('utf8'),
+          ) as FailedCustomerChangeEvent;
+
+          await handler(failedEvent);
+
+          channel.ack(message);
+          replayed += 1;
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+
+          channel.nack(message, false, true);
+          failed += 1;
+
+          this.logger.warn(
+            `DLQ replay stopped after failed message: ${errorMessage}`,
+          );
+
+          break;
+        }
+      }
+
+      const queue = await channel.checkQueue(
+        CUSTOMER_EVENTS_TOPOLOGY.deadLetterQueue.name,
+      );
+
+      return {
+        requestedLimit: limit,
+        processed,
+        replayed,
+        failed,
+        remaining: queue.messageCount,
+      };
+    } finally {
+      await channel.close();
+    }
+  }
+
   async publishCustomerChange(event: CustomerChangeEvent): Promise<void> {
     await this.ensureTopology();
 
@@ -137,31 +252,6 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     }
 
     await channel.waitForConfirms();
-  }
-
-  async consumeCustomerChanges(handler: CustomerEventHandler): Promise<void> {
-    this.consumerHandler = handler;
-
-    await this.startConsumer(handler);
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    this.isShuttingDown = true;
-    this.consumerHandler = null;
-
-    if (this.consumerReconnectTimer !== null) {
-      clearTimeout(this.consumerReconnectTimer);
-      this.consumerReconnectTimer = null;
-    }
-
-    await this.consumerChannel?.close();
-    await this.publisherChannel?.close();
-    await this.connection?.close();
-
-    this.consumerChannel = null;
-    this.publisherChannel = null;
-    this.connection = null;
-    this.topologyReady = false;
   }
 
   async publishFailedCustomerChange(
@@ -193,6 +283,12 @@ export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
     }
 
     await channel.waitForConfirms();
+  }
+
+  async consumeCustomerChanges(handler: CustomerEventHandler): Promise<void> {
+    this.consumerHandler = handler;
+
+    await this.startConsumer(handler);
   }
 
   private async startConsumer(handler: CustomerEventHandler): Promise<void> {

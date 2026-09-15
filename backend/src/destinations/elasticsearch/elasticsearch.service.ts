@@ -1,8 +1,30 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from '@elastic/elasticsearch';
-import type { CustomerChangeEvent } from '../../pipeline/contracts/customer-change-event.contract.js';
+
+import type {
+  CustomerChangeEvent,
+  CustomerPayload,
+  CustomerStatus,
+} from '../../pipeline/contracts/customer-change-event.contract.js';
 import { CUSTOMER_INDEX_DEFINITION } from './customer-index.definition.js';
+
+export interface CustomerSearchOptions {
+  query?: string;
+  status?: CustomerStatus;
+  size: number;
+  searchAfter?: string[];
+}
+
+export interface CustomerSearchHit {
+  customer: CustomerPayload;
+  sort: string[];
+}
+
+export interface CustomerSearchResult {
+  items: CustomerSearchHit[];
+  total: number;
+}
 
 @Injectable()
 export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
@@ -12,7 +34,6 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     const host = this.configService.getOrThrow<string>('ELASTICSEARCH_HOST');
-
     const port = this.configService.getOrThrow<string>('ELASTICSEARCH_PORT');
 
     this.client = new Client({
@@ -70,6 +91,117 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
         ignore: [404],
       },
     );
+  }
+
+  async searchCustomers(
+    options: CustomerSearchOptions,
+  ): Promise<CustomerSearchResult> {
+    const filters = options.status
+      ? [
+          {
+            term: {
+              status: options.status,
+            },
+          },
+        ]
+      : [];
+
+    const query = options.query
+      ? {
+          bool: {
+            should: [
+              {
+                match: {
+                  name: {
+                    query: options.query,
+                    operator: 'and' as const,
+                  },
+                },
+              },
+              {
+                prefix: {
+                  email: {
+                    value: options.query.toLowerCase(),
+                    case_insensitive: true,
+                  },
+                },
+              },
+            ],
+            minimum_should_match: 1,
+            filter: filters,
+          },
+        }
+      : {
+          bool: {
+            must: [
+              {
+                match_all: {},
+              },
+            ],
+            filter: filters,
+          },
+        };
+
+    const result = await this.getClient().search<CustomerPayload>({
+      index: CUSTOMER_INDEX_DEFINITION.index,
+      size: options.size,
+      track_total_hits: true,
+      query,
+      sort: [
+        {
+          updatedAt: {
+            order: 'desc',
+          },
+        },
+        {
+          id: {
+            order: 'asc',
+          },
+        },
+      ],
+      search_after: options.searchAfter,
+    });
+
+    const total =
+      typeof result.hits.total === 'number'
+        ? result.hits.total
+        : (result.hits.total?.value ?? 0);
+
+    const items: CustomerSearchHit[] = [];
+
+    for (const hit of result.hits.hits) {
+      if (!hit._source || !hit.sort) {
+        continue;
+      }
+
+      items.push({
+        customer: hit._source,
+        sort: hit.sort.map((value) => String(value)),
+      });
+    }
+
+    return {
+      items,
+      total,
+    };
+  }
+
+  async findCustomerById(customerId: string): Promise<CustomerPayload | null> {
+    const exists = await this.getClient().exists({
+      index: CUSTOMER_INDEX_DEFINITION.index,
+      id: customerId,
+    });
+
+    if (!exists) {
+      return null;
+    }
+
+    const result = await this.getClient().get<CustomerPayload>({
+      index: CUSTOMER_INDEX_DEFINITION.index,
+      id: customerId,
+    });
+
+    return result._source ?? null;
   }
 
   private getClient(): Client {

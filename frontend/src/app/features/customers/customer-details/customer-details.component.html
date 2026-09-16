@@ -1,0 +1,48 @@
+<section class="customer-details">
+  <a mat-stroked-button routerLink="/customers"> Back to customers </a>
+
+  @if (customer$ | async; as customer) {
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>{{ customer.name }}</mat-card-title>
+        <mat-card-subtitle>{{ customer.email }}</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <dl>
+          <div>
+            <dt>ID</dt>
+            <dd>{{ customer.id }}</dd>
+          </div>
+
+          <div>
+            <dt>Status</dt>
+            <dd>{{ customer.status }}</dd>
+          </div>
+
+          <div>
+            <dt>Version</dt>
+            <dd>{{ customer.version }}</dd>
+          </div>
+
+          <div>
+            <dt>Created</dt>
+            <dd>{{ customer.createdAt | date: 'medium' }}</dd>
+          </div>
+
+          <div>
+            <dt>Updated</dt>
+            <dd>{{ customer.updatedAt | date: 'medium' }}</dd>
+          </div>
+        </dl>
+
+        <h2>Attributes</h2>
+        <pre>{{ customer.attributes | json }}</pre>
+      </mat-card-content>
+    </mat-card>
+  } @else if (errorMessage()) {
+    <p>{{ errorMessage() }}</p>
+  } @else {
+    <mat-spinner diameter="40" aria-label="Loading customer" />
+  }
+</section>

@@ -8,10 +8,7 @@ import { SimulationService } from './simulation.service.js';
 @Module({
   imports: [DatabaseModule],
   controllers: [SimulationController],
-  providers: [
-    SimulationRepository,
-    SimulationService,
-  ],
+  providers: [SimulationRepository, SimulationService],
   exports: [SimulationService],
 })
 export class SimulationModule {}

@@ -1,0 +1,171 @@
+<section class="operations">
+  <header class="operations__header">
+    <div>
+      <h1>Operations</h1>
+      <p>Manage workers and failed events</p>
+    </div>
+
+    <button mat-stroked-button type="button" [disabled]="isBusy()" (click)="refreshStatus()">
+      Refresh status
+    </button>
+  </header>
+
+  @if (successMessage()) {
+    <p class="operations__message operations__message--success">
+      {{ successMessage() }}
+    </p>
+  }
+
+  @if (errorMessage()) {
+    <p class="operations__message operations__message--error">
+      {{ errorMessage() }}
+    </p>
+  }
+
+  @if (systemStatus(); as status) {
+    <div class="operations__panel">
+      <article class="operations__item">
+        <div class="operations__info">
+          <span class="operations__label">Worker</span>
+          <h2>Backfill</h2>
+          <p>Process the current customer snapshot</p>
+        </div>
+
+        <div class="operations__meta">
+          <span
+            class="operations__status"
+            [class.operations__status--success]="
+              status.workers.backfill.status === 'running' ||
+              status.workers.backfill.status === 'completed'
+            "
+          >
+            {{ status.workers.backfill.status }}
+          </span>
+
+          <small>
+            Checkpoint:
+            {{ status.workers.backfill.checkpoint }}
+          </small>
+
+          <small>
+            Processed:
+            {{ status.workers.backfill.processedCount }}
+          </small>
+        </div>
+
+        <div class="operations__actions">
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="
+              isBusy() ||
+              status.workers.backfill.status === 'running' ||
+              status.workers.backfill.status === 'completed'
+            "
+            (click)="startBackfill()"
+          >
+            Start
+          </button>
+
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="isBusy() || status.workers.backfill.status !== 'running'"
+            (click)="stopBackfill()"
+          >
+            Stop
+          </button>
+        </div>
+      </article>
+
+      <article class="operations__item">
+        <div class="operations__info">
+          <span class="operations__label">Worker</span>
+          <h2>Incremental Sync</h2>
+          <p>Continuously process new change-log records</p>
+        </div>
+
+        <div class="operations__meta">
+          <span
+            class="operations__status"
+            [class.operations__status--success]="
+              status.workers.incrementalSync.status === 'running'
+            "
+          >
+            {{ status.workers.incrementalSync.status }}
+          </span>
+
+          <small>
+            Checkpoint:
+            {{ status.workers.incrementalSync.checkpoint }}
+          </small>
+
+          <small>
+            Processed:
+            {{ status.workers.incrementalSync.processedCount }}
+          </small>
+        </div>
+
+        <div class="operations__actions">
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="isBusy() || status.workers.incrementalSync.status === 'running'"
+            (click)="startIncrementalSync()"
+          >
+            Start
+          </button>
+
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="isBusy() || status.workers.incrementalSync.status !== 'running'"
+            (click)="stopIncrementalSync()"
+          >
+            Stop
+          </button>
+        </div>
+      </article>
+
+      <article class="operations__item">
+        <div class="operations__info">
+          <span class="operations__label">Queue</span>
+          <h2>Dead-letter queue</h2>
+          <p>Replay failed customer events</p>
+        </div>
+
+        <div class="operations__meta">
+          <span class="operations__status">
+            {{ status.pipeline.deadLetterQueueMessageCount }}
+            pending
+          </span>
+        </div>
+
+        <div class="operations__replay">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Limit</mat-label>
+
+            <input matInput type="number" min="1" max="1000" [formControl]="replayLimit" />
+
+            @if (replayLimit.invalid && replayLimit.touched) {
+              <mat-error> Enter a value between 1 and 1000 </mat-error>
+            }
+          </mat-form-field>
+
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="isBusy() || status.pipeline.deadLetterQueueMessageCount === 0"
+            (click)="replayDeadLetterQueue()"
+          >
+            {{ isReplaying() ? 'Replaying...' : 'Replay' }}
+          </button>
+        </div>
+      </article>
+    </div>
+  } @else {
+    <p>Loading current system status...</p>
+  }
+
+  <app-simulation-controls />
+</section>

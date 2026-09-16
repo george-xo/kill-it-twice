@@ -2,25 +2,36 @@
 
 ## დავალება
 
-Pipeline-ის სამართავი ფუნქციური Angular UI-ის შექმნა.
+Pipeline-ის მონიტორინგისა და მართვისთვის Angular 21 control panel-ის შექმნა.
 
 ## Scope
 
-- სისტემის health, throughput, lag და DLQ dashboard;
+- სისტემის health, workers და pipeline metrics dashboard;
 - customer-ების ძებნა, pagination და details;
 - Backfill და Incremental Sync start/stop;
-- source ცვლილებისა და failure-ის simulation;
-- DLQ replay;
-- backend API-ს პერიოდული განახლება.
+- Elasticsearch და RabbitMQ failure simulation;
+- customer ცვლილებისა და poison event-ის შექმნა;
+- DLQ მდგომარეობის ნახვა და replay;
+- frontend-ისა და backend-ის `/api` proxy-ით დაკავშირება.
 
 ## წარმატების კრიტერიუმები
 
-- [ ] ოთხივე UI ფუნქცია ხელმისაწვდომია;
-- [ ] worker-ების მართვა UI-დან მუშაობს;
-- [ ] customer ცვლილებები UI-ში ახლდება;
-- [ ] failure და recovery ვიზუალურად ჩანს;
-- [ ] DLQ replay UI-დან სრულდება.
+- [x] Dashboard აჩვენებს სისტემისა და pipeline-ის მდგომარეობას;
+- [x] customer list, search, pagination და details მუშაობს;
+- [x] worker-ების მართვა UI-დან მუშაობს;
+- [x] failure simulation და recovery მუშაობს;
+- [x] DLQ replay UI-დან სრულდება;
+- [x] frontend Docker Compose-ით ეშვება;
+- [x] G1–G5 verification კვლავ წარმატებით სრულდება.
 
 ## შედეგი
 
-ჯერ არ არის შესრულებული.
+დაემატა Angular Material-ზე აგებული control panel, საჭირო backend API-ები და უსაფრთხო simulation controls.
+
+G5 verification-ში გასწორდა Source-სა და Elasticsearch-ს შორის დარჩენილი მონაცემების შეუსაბამობა.
+
+## ცვლილებები საწყის გეგმასთან შედარებით
+
+პერიოდული ავტომატური refresh-ის ნაცვლად გამოყენებულია ხელით განახლება, რათა UI-ის ქცევა მარტივი და პროგნოზირებადი დარჩეს.
+
+Authentication და frontend automated tests ამ ეტაპის scope-ში არ შესულა.

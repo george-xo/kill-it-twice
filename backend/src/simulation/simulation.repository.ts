@@ -21,8 +21,7 @@ export class SimulationRepository {
       ON CONFLICT (name) DO NOTHING;
     `);
 
-    const result =
-      await this.databaseService.query<SimulationStateRow>(`
+    const result = await this.databaseService.query<SimulationStateRow>(`
         SELECT
           elasticsearch_failure_enabled,
           rabbitmq_failure_enabled,
@@ -85,9 +84,8 @@ export class SimulationRepository {
   async toggleCustomerStatus(
     customerId: string,
   ): Promise<SimulatedCustomerChange | null> {
-    const result =
-      await this.databaseService.query<SimulatedCustomerChangeRow>(
-        `
+    const result = await this.databaseService.query<SimulatedCustomerChangeRow>(
+      `
           UPDATE customers
           SET
             status = CASE
@@ -101,8 +99,8 @@ export class SimulationRepository {
             version::TEXT,
             updated_at;
         `,
-        [customerId],
-      );
+      [customerId],
+    );
 
     const customer = result.rows[0];
 

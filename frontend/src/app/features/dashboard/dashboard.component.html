@@ -1,0 +1,180 @@
+<section class="dashboard">
+  <header class="dashboard__header">
+    <div>
+      <h1>System dashboard</h1>
+      <p>Pipeline health, workers and delivery metrics</p>
+    </div>
+
+    <button mat-stroked-button type="button" (click)="reload()">Refresh</button>
+  </header>
+
+  @if (systemStatus$ | async; as systemStatus) {
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>System status</mat-card-title>
+        <mat-card-subtitle>
+          Last checked: {{ systemStatus.checkedAt | date: 'MMM d, y, HH:mm' }}
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <strong>{{ systemStatus.status }}</strong>
+      </mat-card-content>
+    </mat-card>
+
+    <section>
+      <h2>Dependencies</h2>
+
+      <div class="dashboard__grid">
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>PostgreSQL</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.dependencies.database.status }}
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Elasticsearch</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.dependencies.elasticsearch.status }}
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>RabbitMQ</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.dependencies.rabbitmq.status }}
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </section>
+
+    <section>
+      <h2>Workers</h2>
+
+      <div class="dashboard__grid">
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Backfill</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            <p>Status: {{ systemStatus.workers.backfill.status }}</p>
+            <p>Checkpoint: {{ systemStatus.workers.backfill.checkpoint }}</p>
+            <p>
+              Processed:
+              {{ systemStatus.workers.backfill.processedCount }}
+            </p>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Incremental Sync</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            <p>Status: {{ systemStatus.workers.incrementalSync.status }}</p>
+            <p>
+              Checkpoint:
+              {{ systemStatus.workers.incrementalSync.checkpoint }}
+            </p>
+            <p>
+              Processed:
+              {{ systemStatus.workers.incrementalSync.processedCount }}
+            </p>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </section>
+
+    <section>
+      <h2>Pipeline</h2>
+
+      <div class="dashboard__grid">
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Source records</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.pipeline.sourceRecordCount }}
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Incremental lag</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.pipeline.incrementalLag }}
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Throughput</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.pipeline.throughputPerSecond }} events/s
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Delivered events</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.pipeline.counters.deliveredEvents }}
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Duplicate events</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.pipeline.counters.duplicateEvents }}
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-card-title>Dead-letter events</mat-card-title>
+          </mat-card-header>
+
+          <mat-card-content>
+            {{ systemStatus.pipeline.counters.deadLetterEvents }}
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </section>
+  } @else if (errorMessage()) {
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Backend is unavailable</mat-card-title>
+      </mat-card-header>
+
+      <mat-card-content>
+        <p>{{ errorMessage() }}</p>
+
+        <button mat-flat-button type="button" (click)="reload()">Try again</button>
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <mat-spinner diameter="40" aria-label="Loading system status" />
+  }
+</section>

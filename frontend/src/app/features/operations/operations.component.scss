@@ -1,0 +1,239 @@
+.operations {
+  display: grid;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--spacing-10) var(--spacing-8);
+  gap: var(--spacing-6);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+
+    h1 {
+      margin-bottom: var(--spacing-2);
+    }
+
+    p {
+      margin: 0;
+    }
+
+    button {
+      flex-shrink: 0;
+    }
+  }
+
+  &__panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-5);
+  }
+
+  &__item {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 230px;
+    padding: var(--spacing-6);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-large);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-small);
+    gap: var(--spacing-5);
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease;
+
+    &::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 4px;
+      background: var(--color-primary);
+      content: '';
+    }
+
+    &:hover {
+      box-shadow: var(--shadow-medium);
+      transform: translateY(-2px);
+    }
+
+    &:last-child {
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      min-height: auto;
+
+      &::before {
+        background: var(--color-warning);
+      }
+
+      .operations__info {
+        grid-column: 1;
+      }
+
+      .operations__meta {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .operations__replay {
+        grid-column: 3;
+        grid-row: 1;
+      }
+    }
+  }
+
+  &__info {
+    h2 {
+      margin-bottom: var(--spacing-2);
+      font-size: 1.25rem;
+    }
+
+    p {
+      max-width: 360px;
+      margin: 0;
+    }
+  }
+
+  &__label {
+    display: block;
+    margin-bottom: var(--spacing-3);
+    color: var(--color-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &__meta {
+    display: grid;
+    align-self: start;
+    justify-items: end;
+    gap: var(--spacing-2);
+
+    small {
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+    }
+  }
+
+  &__status {
+    padding: 6px var(--spacing-3);
+    border-radius: 999px;
+    background: var(--color-surface-secondary);
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: capitalize;
+
+    &--success {
+      background: var(--color-success-soft);
+      color: var(--color-success);
+    }
+  }
+
+  &__actions {
+    display: flex;
+    grid-column: 1 / -1;
+    align-self: end;
+    justify-content: flex-end;
+    gap: var(--spacing-2);
+
+    button {
+      min-width: 96px;
+    }
+  }
+
+  &__replay {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-3);
+
+    mat-form-field {
+      width: 120px;
+    }
+
+    button {
+      min-width: 96px;
+    }
+  }
+
+  &__message {
+    margin: 0;
+    padding: var(--spacing-3) var(--spacing-4);
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-medium);
+
+    &--success {
+      border-color: var(--color-success);
+      background: var(--color-success-soft);
+      color: var(--color-success);
+    }
+
+    &--error {
+      border-color: var(--color-danger);
+      background: var(--color-danger-soft);
+      color: var(--color-danger);
+    }
+  }
+
+  @media (max-width: 900px) {
+    padding: var(--spacing-6) var(--spacing-4);
+
+    &__panel {
+      grid-template-columns: 1fr;
+    }
+
+    &__item {
+      grid-column: auto;
+
+      &:last-child {
+        grid-column: auto;
+        grid-template-columns: minmax(0, 1fr) auto;
+
+        .operations__replay {
+          grid-column: 1 / -1;
+          grid-row: auto;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 560px) {
+    &__header {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    &__item,
+    &__item:last-child {
+      grid-template-columns: 1fr;
+    }
+
+    &__meta,
+    &__item:last-child .operations__meta {
+      grid-column: 1;
+      grid-row: auto;
+      justify-items: start;
+    }
+
+    &__actions,
+    &__replay,
+    &__item:last-child .operations__replay {
+      grid-column: 1;
+      grid-row: auto;
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    &__replay {
+      mat-form-field {
+        width: 100%;
+      }
+    }
+  }
+}

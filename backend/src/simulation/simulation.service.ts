@@ -19,9 +19,7 @@ export class SimulationService {
   private cachedState: SimulationState | null = null;
   private cacheExpiresAt = 0;
 
-  constructor(
-    private readonly simulationRepository: SimulationRepository,
-  ) {}
+  constructor(private readonly simulationRepository: SimulationRepository) {}
 
   async getState(forceRefresh: boolean = false): Promise<SimulationState> {
     const now = Date.now();
@@ -59,10 +57,7 @@ export class SimulationService {
   ): Promise<SimulationState> {
     const destination = this.parseDestination(destinationValue);
 
-    await this.simulationRepository.setDestinationFailure(
-      destination,
-      true,
-    );
+    await this.simulationRepository.setDestinationFailure(destination, true);
 
     return this.getState(true);
   }
@@ -72,10 +67,7 @@ export class SimulationService {
   ): Promise<SimulationState> {
     const destination = this.parseDestination(destinationValue);
 
-    await this.simulationRepository.setDestinationFailure(
-      destination,
-      false,
-    );
+    await this.simulationRepository.setDestinationFailure(destination, false);
 
     return this.getState(true);
   }
@@ -90,18 +82,14 @@ export class SimulationService {
     customerId: string,
   ): Promise<SimulatedCustomerChange> {
     if (!/^[1-9]\d*$/.test(customerId)) {
-      throw new BadRequestException(
-        'Customer ID must be a positive integer',
-      );
+      throw new BadRequestException('Customer ID must be a positive integer');
     }
 
     const customer =
       await this.simulationRepository.toggleCustomerStatus(customerId);
 
     if (!customer) {
-      throw new NotFoundException(
-        `Customer "${customerId}" was not found`,
-      );
+      throw new NotFoundException(`Customer "${customerId}" was not found`);
     }
 
     return customer;

@@ -1,0 +1,20 @@
+<aside class="sidebar">
+  <nav class="sidebar__navigation" aria-label="Main navigation">
+    <a
+      class="sidebar__link"
+      routerLink="/"
+      routerLinkActive="sidebar__link--active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Dashboard
+    </a>
+
+    <a class="sidebar__link" routerLink="/customers" routerLinkActive="sidebar__link--active">
+      Customers
+    </a>
+
+    <a class="sidebar__link" routerLink="/operations" routerLinkActive="sidebar__link--active">
+      Operations
+    </a>
+  </nav>
+</aside>

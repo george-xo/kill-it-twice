@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Controller, Get, Param, Post } from '@nestjs/common';
 
 import type {
   PoisonChangeResult,
@@ -14,9 +9,7 @@ import { SimulationService } from './simulation.service.js';
 
 @Controller('simulations')
 export class SimulationController {
-  constructor(
-    private readonly simulationService: SimulationService,
-  ) {}
+  constructor(private readonly simulationService: SimulationService) {}
 
   @Get()
   getState(): Promise<SimulationState> {

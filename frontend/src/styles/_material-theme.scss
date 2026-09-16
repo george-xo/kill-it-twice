@@ -1,0 +1,27 @@
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme(
+    (
+      color: (
+        theme-type: light,
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: sans-serif,
+      density: 0,
+    )
+  );
+
+  @include mat.form-field-overrides(
+    (
+      outlined-container-shape: var(--border-radius-medium),
+    )
+  );
+
+  @include mat.progress-spinner-overrides(
+    (
+      active-indicator-color: var(--color-primary),
+    )
+  );
+}

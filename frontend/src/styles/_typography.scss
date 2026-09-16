@@ -1,0 +1,41 @@
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--color-text-primary);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+h1 {
+  margin-bottom: var(--spacing-2);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  letter-spacing: -0.03em;
+}
+
+h2 {
+  margin-bottom: var(--spacing-4);
+  font-size: 1.25rem;
+}
+
+h3 {
+  margin-bottom: var(--spacing-3);
+  font-size: 1rem;
+}
+
+p {
+  margin-bottom: var(--spacing-4);
+  color: var(--color-text-secondary);
+}
+
+strong {
+  font-weight: 700;
+}

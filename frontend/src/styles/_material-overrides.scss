@@ -1,0 +1,44 @@
+.mat-toolbar,
+.mat-mdc-list-item,
+.mat-mdc-button-base,
+.mat-mdc-form-field,
+.mat-mdc-table,
+.mat-mdc-cell,
+.mat-mdc-header-cell,
+.mat-mdc-input-element,
+.mat-mdc-select,
+.mat-mdc-select-value,
+.mat-mdc-floating-label,
+.mdc-button__label,
+.mdc-list-item__primary-text {
+  font-family: inherit !important;
+}
+
+.mat-mdc-button-base {
+  min-height: 48px;
+  padding-inline: var(--spacing-5) !important;
+  font-weight: 600 !important;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mat-mdc-header-cell {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.mat-mdc-cell {
+  font-size: 0.875rem;
+}
+
+.mat-mdc-floating-label,
+.mat-mdc-select-value,
+.mat-mdc-input-element {
+  font-size: 1rem;
+}
+
+.mdc-list-item__primary-text {
+  font-size: 0.9375rem;
+}

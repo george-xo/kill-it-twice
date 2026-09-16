@@ -1,0 +1,135 @@
+.simulation-controls {
+  display: grid;
+  padding-top: var(--spacing-4);
+  gap: var(--spacing-5);
+
+  &__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+
+    h2 {
+      margin-bottom: var(--spacing-2);
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+
+  &__destinations,
+  &__tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-4);
+  }
+
+  &__item {
+    display: grid;
+    align-content: space-between;
+    min-height: 210px;
+    padding: var(--spacing-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-large);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-small);
+    gap: var(--spacing-5);
+
+    h3 {
+      margin-bottom: var(--spacing-2);
+      font-size: 1.125rem;
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+
+  &__label {
+    display: block;
+    margin-bottom: var(--spacing-2);
+    color: var(--color-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &__actions,
+  &__customer-form {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+
+    button {
+      white-space: nowrap;
+    }
+  }
+
+  &__actions {
+    justify-content: flex-end;
+  }
+
+  &__customer-form {
+    mat-form-field {
+      flex: 1;
+    }
+  }
+
+  &__message,
+  &__result {
+    margin: 0;
+    padding: var(--spacing-3) var(--spacing-4);
+    border-radius: var(--border-radius-medium);
+  }
+
+  &__message {
+    border: 1px solid transparent;
+
+    &--success {
+      border-color: var(--color-success);
+      background: var(--color-success-soft);
+      color: var(--color-success);
+    }
+
+    &--error {
+      border-color: var(--color-danger);
+      background: var(--color-danger-soft);
+      color: var(--color-danger);
+    }
+  }
+
+  &__result {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  @media (max-width: 800px) {
+    &__destinations,
+    &__tools {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 560px) {
+    &__header,
+    &__actions,
+    &__customer-form {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    &__header {
+      align-items: flex-start;
+    }
+
+    &__actions button,
+    &__customer-form button,
+    &__customer-form mat-form-field {
+      width: 100%;
+    }
+  }
+}

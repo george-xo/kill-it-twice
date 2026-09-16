@@ -9,6 +9,9 @@ POSTGRES_USER_NAME=app_user
 POSTGRES_DATABASE_NAME=kill_it_twice
 BACKFILL_JOB_NAME=customers
 
+MAIN_QUEUE_NAME=customer.events.consumer
+DEAD_LETTER_QUEUE_NAME=customer.events.dlq
+
 fail() {
   echo "G5 observability ................ FAIL"
   echo "$1"
@@ -77,7 +80,8 @@ restore_environment() {
     -c "
       UPDATE backfill_jobs
       SET
-        status = 'pending',
+        status = 'completed',
+        stop_requested = FALSE,
         last_error = NULL
       WHERE name = '${BACKFILL_JOB_NAME}';
     " >/dev/null 2>&1 || true
@@ -96,6 +100,7 @@ docker compose build \
   backend \
   migrate \
   destination-setup \
+  backfill \
   consumer \
   incremental-sync
 
@@ -118,14 +123,31 @@ docker compose run --rm \
   node dist/seed/seed.js \
   >/dev/null
 
+curl -sS \
+  -X DELETE \
+  http://localhost:9200/customers \
+  >/dev/null || true
+
 docker compose run --rm destination-setup >/dev/null
 
+docker compose run \
+  --rm \
+  --no-deps \
+  backfill \
+  >/dev/null
+
+query_postgres "
+  TRUNCATE TABLE
+    consumer_processed_events,
+    pipeline_metrics;
+" >/dev/null
+
 docker compose exec -T rabbitmq \
-  rabbitmqctl purge_queue customer.events.consumer \
+  rabbitmqctl purge_queue "${MAIN_QUEUE_NAME}" \
   >/dev/null
 
 docker compose exec -T rabbitmq \
-  rabbitmqctl purge_queue customer.events.dlq \
+  rabbitmqctl purge_queue "${DEAD_LETTER_QUEUE_NAME}" \
   >/dev/null
 
 docker compose up -d --force-recreate \
@@ -182,7 +204,8 @@ fi
 query_postgres "
   UPDATE backfill_jobs
   SET
-    status = 'pending',
+    status = 'completed',
+    stop_requested = FALSE,
     last_error = NULL
   WHERE name = '${BACKFILL_JOB_NAME}';
 " >/dev/null
@@ -267,9 +290,37 @@ if [[ "${final_status}" != *'"status":"healthy"'* ]]; then
   fail "Final system status is not healthy"
 fi
 
+curl -fsS \
+  -X POST \
+  http://localhost:9200/customers/_refresh \
+  >/dev/null
+
+source_record_count="$(
+  query_postgres "
+    SELECT COUNT(*)
+    FROM customers;
+  " | tr -d '[:space:]'
+)"
+
+elasticsearch_record_count="$(
+  curl -fsS \
+    'http://localhost:9200/_cat/count/customers?h=count' |
+    tr -d '[:space:]'
+)"
+
+if [[ "${source_record_count}" != "${SEED_COUNT}" ]]; then
+  fail "Expected ${SEED_COUNT} source records, got ${source_record_count}"
+fi
+
+if [[ "${elasticsearch_record_count}" != "${SEED_COUNT}" ]]; then
+  fail "Expected ${SEED_COUNT} Elasticsearch records, got ${elasticsearch_record_count}"
+fi
+
 echo "G5 observability ................ PASS"
 echo "System status ................... healthy"
 echo "Delivered events ................ ${delivered_count}"
 echo "Elasticsearch retries ........... ${retry_count}"
 echo "Processed consumer events ....... ${consumer_count}"
+echo "Source records .................. ${source_record_count}"
+echo "Elasticsearch records ........... ${elasticsearch_record_count}"
 echo "Structured logs ................. PASS"

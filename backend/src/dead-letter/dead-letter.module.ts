@@ -6,10 +6,7 @@ import { DeadLetterReplayController } from './dead-letter-replay.controller.js';
 import { DeadLetterReplayService } from './dead-letter-replay.service.js';
 
 @Module({
-  imports: [
-    RabbitMqModule,
-    PipelineModule,
-  ],
+  imports: [RabbitMqModule, PipelineModule],
   controllers: [DeadLetterReplayController],
   providers: [DeadLetterReplayService],
 })

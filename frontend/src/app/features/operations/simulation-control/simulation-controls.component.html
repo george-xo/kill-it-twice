@@ -1,0 +1,165 @@
+<section class="simulation-controls">
+  <header class="simulation-controls__header">
+    <div>
+      <h2>Failure simulations</h2>
+      <p>Trigger controlled failures and customer changes</p>
+    </div>
+
+    @if (simulationState(); as state) {
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="
+          isBusy() ||
+          (!state.destinations.elasticsearch.failureEnabled &&
+            !state.destinations.rabbitmq.failureEnabled)
+        "
+        (click)="recoverAllDestinations()"
+      >
+        Recover all
+      </button>
+    }
+  </header>
+
+  @if (successMessage()) {
+    <p class="simulation-controls__message simulation-controls__message--success">
+      {{ successMessage() }}
+    </p>
+  }
+
+  @if (errorMessage()) {
+    <p class="simulation-controls__message simulation-controls__message--error">
+      {{ errorMessage() }}
+    </p>
+  }
+
+  @if (simulationState(); as state) {
+    <div class="simulation-controls__destinations">
+      <article class="simulation-controls__item">
+        <div>
+          <span class="simulation-controls__label"> Destination </span>
+
+          <h3>Elasticsearch</h3>
+
+          <p>
+            Failure:
+            {{ state.destinations.elasticsearch.failureEnabled ? 'enabled' : 'disabled' }}
+          </p>
+        </div>
+
+        <div class="simulation-controls__actions">
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="isBusy() || state.destinations.elasticsearch.failureEnabled"
+            (click)="failDestination('elasticsearch')"
+          >
+            Simulate failure
+          </button>
+
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="isBusy() || !state.destinations.elasticsearch.failureEnabled"
+            (click)="recoverDestination('elasticsearch')"
+          >
+            Recover
+          </button>
+        </div>
+      </article>
+
+      <article class="simulation-controls__item">
+        <div>
+          <span class="simulation-controls__label"> Destination </span>
+
+          <h3>RabbitMQ</h3>
+
+          <p>
+            Failure:
+            {{ state.destinations.rabbitmq.failureEnabled ? 'enabled' : 'disabled' }}
+          </p>
+        </div>
+
+        <div class="simulation-controls__actions">
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="isBusy() || state.destinations.rabbitmq.failureEnabled"
+            (click)="failDestination('rabbitmq')"
+          >
+            Simulate failure
+          </button>
+
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="isBusy() || !state.destinations.rabbitmq.failureEnabled"
+            (click)="recoverDestination('rabbitmq')"
+          >
+            Recover
+          </button>
+        </div>
+      </article>
+    </div>
+
+    <div class="simulation-controls__tools">
+      <article class="simulation-controls__item">
+        <div>
+          <span class="simulation-controls__label"> Customer change </span>
+
+          <h3>Toggle customer status</h3>
+          <p>Create a real customer UPDATE event.</p>
+        </div>
+
+        <form class="simulation-controls__customer-form" (ngSubmit)="toggleCustomerStatus()">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Customer ID</mat-label>
+
+            <input matInput type="text" inputmode="numeric" [formControl]="customerId" />
+
+            @if (customerId.invalid && customerId.touched) {
+              <mat-error> Enter a valid customer ID </mat-error>
+            }
+          </mat-form-field>
+
+          <button mat-flat-button type="submit" [disabled]="isBusy()">Toggle status</button>
+        </form>
+
+        @if (lastCustomerChange(); as customerChange) {
+          <p class="simulation-controls__result">
+            Customer {{ customerChange.id }} is now {{ customerChange.status }}, version
+            {{ customerChange.version }}.
+          </p>
+        }
+      </article>
+
+      <article class="simulation-controls__item">
+        <div>
+          <span class="simulation-controls__label"> Failed event </span>
+
+          <h3>Create poison change</h3>
+          <p>Create an intentionally invalid change for DLQ testing.</p>
+        </div>
+
+        <div class="simulation-controls__actions">
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="isBusy()"
+            (click)="createPoisonChange()"
+          >
+            Create poison change
+          </button>
+        </div>
+
+        @if (lastPoisonChange(); as poisonChange) {
+          <p class="simulation-controls__result">
+            Change {{ poisonChange.changeLogId }} created for entity {{ poisonChange.entityId }}.
+          </p>
+        }
+      </article>
+    </div>
+  } @else {
+    <p>Loading simulation state...</p>
+  }
+</section>

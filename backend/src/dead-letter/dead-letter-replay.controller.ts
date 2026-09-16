@@ -1,10 +1,4 @@
-import {
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Controller, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 
 import type { DeadLetterReplayResult } from '../pipeline/contracts/dead-letter-replay.contract.js';
 import { DeadLetterReplayService } from './dead-letter-replay.service.js';

@@ -1,4 +1,4 @@
-import { PIPELINE_METRICS } from './pipeline-metrics.constants.js';
+import { PIPELINE_METRICS } from '../constants/pipeline-metrics.constants.js';
 
 export const PIPELINE_METRIC_DEFINITIONS = [
   {

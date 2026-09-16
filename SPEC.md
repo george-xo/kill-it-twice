@@ -20,6 +20,6 @@
 | 10  | G5 — მეტრიკები და სისტემის მდგომარეობა   | [specs/10-observability.md](./specs/10-observability.md)                             | Completed |
 | 11  | G1–G5 საბოლოო Verification               | [specs/11-verification-harness.md](./specs/11-verification-harness.md)               | Completed |
 | 12  | Angular Control Panel                    | [specs/12-angular-control-panel.md](./specs/12-angular-control-panel.md)             | Completed |
-| 13  | საბოლოო Checks და Script Validation      | [specs/13-final-checks.md](./specs/13-final-checks.md)                               | Planned   |
+| 13  | საბოლოო Checks და Script Validation      | [specs/13-final-checks.md](./specs/13-final-checks.md)                               | Completed |
 
 შემდეგი specification-ები პროექტის განვითარებასთან ერთად დაემატება.

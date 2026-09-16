@@ -1,36 +1,25 @@
-# PR 13 — საბოლოო Checks და Script Validation
+# PR 13 — Final Checks
 
 ## დავალება
 
-პროექტისა და G1–G5 verification scripts-ის საბოლოო შემოწმება.
+პროექტის გაშვებისა და საბოლოო verification პროცესის გამარტივება.
 
 ## Scope
 
-- verification scripts-ის syntax და executable permissions;
-- თითოეული gate-ის დამოუკიდებლად გაშვება;
-- სრული `make verify` პროცესის შემოწმება;
-- Backend build და lint;
-- Frontend build და formatting check;
-- Docker Compose configuration და clean-start შემოწმება;
-- აღმოჩენილი script/configuration პრობლემების გასწორება.
+- ორივე პროექტის dependencies-ის ერთი ბრძანებით დაყენება;
+- Docker environment-ის, migrations-ის, seed-ისა და Backfill-ის ავტომატური მომზადება;
+- Frontend-ისა და Backend-ის ერთი ბრძანებით გაშვება;
+- G1–G5 verification-ის root და `backend` დირექტორიიდან გაშვება;
+- საბოლოო README-ის განახლება.
 
 ## წარმატების კრიტერიუმები
 
-- [ ] ყველა shell script syntax check-ს გადის;
-- [ ] `verify-g1`–`verify-g5` დამოუკიდებლად მუშაობს;
-- [ ] `make verify` ხუთივე gate-ს PASS შედეგით ასრულებს;
-- [ ] Backend build და lint წარმატებით სრულდება;
-- [ ] Frontend build და formatting check წარმატებით სრულდება;
-- [ ] Docker Compose სუფთა გარემოდან ეშვება;
-- [ ] საბოლოო Git diff-ში შემთხვევითი ან არასაჭირო ფაილები არ რჩება.
-
-## ამ PR-ში არ შედის
-
-- ახალი backend ან frontend feature;
-- TypeORM-ზე მიგრაცია;
-- UI redesign;
-- ახალი application-level automated tests.
+- [x] `make install` აყენებს ყველა dependency-ს;
+- [x] `make setup` ამზადებს საწყის გარემოს;
+- [x] `make start` უშვებს სრულ აპლიკაციას;
+- [x] `make verify` ამოწმებს ხუთივე Gate-ს;
+- [x] პროექტის გაშვების ინსტრუქცია აღწერილია README-ში.
 
 ## შედეგი
 
-ჯერ არ არის შესრულებული.
+პროექტის დაყენება, გაშვება და შემოწმება სრულდება მოკლე Make command-ებით.

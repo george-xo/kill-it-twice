@@ -35,21 +35,21 @@
           <span
             class="operations__status"
             [class.operations__status--success]="
-              status.workers.backfill.status === 'running' ||
-              status.workers.backfill.status === 'completed'
+              status.workers.backfill?.status === workerStatuses.RUNNING ||
+              status.workers.backfill?.status === workerStatuses.COMPLETED
             "
           >
-            {{ status.workers.backfill.status }}
+            {{ status.workers.backfill?.status ?? displayLabels.UNAVAILABLE }}
           </span>
 
           <small>
             Checkpoint:
-            {{ status.workers.backfill.checkpoint }}
+            {{ status.workers.backfill?.checkpoint ?? displayLabels.UNAVAILABLE }}
           </small>
 
           <small>
             Processed:
-            {{ status.workers.backfill.processedCount }}
+            {{ status.workers.backfill?.processedCount ?? displayLabels.UNAVAILABLE }}
           </small>
         </div>
 
@@ -59,8 +59,9 @@
             type="button"
             [disabled]="
               isBusy() ||
-              status.workers.backfill.status === 'running' ||
-              status.workers.backfill.status === 'completed'
+              status.workers.backfill === null ||
+              status.workers.backfill.status === workerStatuses.RUNNING ||
+              status.workers.backfill.status === workerStatuses.COMPLETED
             "
             (click)="startBackfill()"
           >
@@ -70,7 +71,11 @@
           <button
             mat-stroked-button
             type="button"
-            [disabled]="isBusy() || status.workers.backfill.status !== 'running'"
+            [disabled]="
+              isBusy() ||
+              status.workers.backfill === null ||
+              status.workers.backfill.status !== workerStatuses.RUNNING
+            "
             (click)="stopBackfill()"
           >
             Stop
@@ -89,20 +94,20 @@
           <span
             class="operations__status"
             [class.operations__status--success]="
-              status.workers.incrementalSync.status === 'running'
+              status.workers.incrementalSync?.status === workerStatuses.RUNNING
             "
           >
-            {{ status.workers.incrementalSync.status }}
+            {{ status.workers.incrementalSync?.status ?? displayLabels.UNAVAILABLE }}
           </span>
 
           <small>
             Checkpoint:
-            {{ status.workers.incrementalSync.checkpoint }}
+            {{ status.workers.incrementalSync?.checkpoint ?? displayLabels.UNAVAILABLE }}
           </small>
 
           <small>
             Processed:
-            {{ status.workers.incrementalSync.processedCount }}
+            {{ status.workers.incrementalSync?.processedCount ?? displayLabels.UNAVAILABLE }}
           </small>
         </div>
 
@@ -110,7 +115,11 @@
           <button
             mat-flat-button
             type="button"
-            [disabled]="isBusy() || status.workers.incrementalSync.status === 'running'"
+            [disabled]="
+              isBusy() ||
+              status.workers.incrementalSync === null ||
+              status.workers.incrementalSync.status === workerStatuses.RUNNING
+            "
             (click)="startIncrementalSync()"
           >
             Start
@@ -119,7 +128,11 @@
           <button
             mat-stroked-button
             type="button"
-            [disabled]="isBusy() || status.workers.incrementalSync.status !== 'running'"
+            [disabled]="
+              isBusy() ||
+              status.workers.incrementalSync === null ||
+              status.workers.incrementalSync.status !== workerStatuses.RUNNING
+            "
             (click)="stopIncrementalSync()"
           >
             Stop
@@ -136,8 +149,12 @@
 
         <div class="operations__meta">
           <span class="operations__status">
-            {{ status.pipeline.deadLetterQueueMessageCount }}
-            pending
+            @if (status.pipeline.deadLetterQueueMessageCount !== null) {
+              {{ status.pipeline.deadLetterQueueMessageCount }}
+              pending
+            } @else {
+              {{ displayLabels.UNAVAILABLE }}
+            }
           </span>
         </div>
 
@@ -145,26 +162,39 @@
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Limit</mat-label>
 
-            <input matInput type="number" min="1" max="1000" [formControl]="replayLimit" />
+            <input
+              matInput
+              type="number"
+              min="1"
+              [max]="maximumDlqReplayLimit"
+              [formControl]="replayLimit"
+            />
 
             @if (replayLimit.invalid && replayLimit.touched) {
-              <mat-error> Enter a value between 1 and 1000 </mat-error>
+              <mat-error>
+                Enter a value between 1 and
+                {{ maximumDlqReplayLimit }}
+              </mat-error>
             }
           </mat-form-field>
 
           <button
             mat-flat-button
             type="button"
-            [disabled]="isBusy() || status.pipeline.deadLetterQueueMessageCount === 0"
+            [disabled]="
+              isBusy() ||
+              status.pipeline.deadLetterQueueMessageCount === null ||
+              status.pipeline.deadLetterQueueMessageCount === 0
+            "
             (click)="replayDeadLetterQueue()"
           >
-            {{ isReplaying() ? 'Replaying...' : 'Replay' }}
+            {{ isReplaying() ? operationLabels.REPLAYING : operationLabels.REPLAY }}
           </button>
         </div>
       </article>
     </div>
   } @else {
-    <p>Loading current system status...</p>
+    <p>{{ operationLabels.LOADING_STATUS }}</p>
   }
 
   <app-simulation-controls />

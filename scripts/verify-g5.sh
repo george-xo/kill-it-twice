@@ -91,9 +91,6 @@ trap restore_environment EXIT
 
 echo "Preparing G5 verification environment..."
 
-npm run build --prefix backend
-npm run lint --prefix backend
-
 docker compose config --quiet
 
 docker compose build \

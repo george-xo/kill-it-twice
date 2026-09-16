@@ -1,5 +1,10 @@
 import type { QueryResultRow } from 'pg';
 
+import type {
+  WorkerName,
+  WorkerState,
+} from '../../workers/models/worker-command-response.model.js';
+
 export type DependencyState = 'up' | 'down';
 export type SystemState = 'healthy' | 'degraded';
 
@@ -8,7 +13,7 @@ export interface DependencyStatus {
 }
 
 export interface WorkerStatus {
-  status: string;
+  status: WorkerState;
   checkpoint: number;
   processedCount: number;
   stopRequested: boolean;
@@ -53,11 +58,9 @@ export interface SystemStatus {
   pipeline: PipelineStatus;
 }
 
-export type WorkerName = 'backfill' | 'incrementalSync';
-
 export interface WorkerStatusRow extends QueryResultRow {
   worker_name: WorkerName;
-  status: string;
+  status: WorkerState;
   checkpoint: string;
   processed_count: string;
   stop_requested: boolean;

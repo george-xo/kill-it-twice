@@ -1,17 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Counter, Registry } from 'prom-client';
 
-import type { PipelineMetricName } from './pipeline-metrics.constants.js';
-import { PIPELINE_METRIC_DEFINITIONS } from './pipeline-metric-definitions.js';
+import type { PipelineMetricName } from '../constants/pipeline-metrics.constants.js';
+import { PIPELINE_METRIC_DEFINITIONS } from '../constants/pipeline-metric-definitions.js';
 import { PipelineMetricsService } from './pipeline-metrics.service.js';
 
 @Injectable()
-export class PrometheusMetricsService {
+export class PrometheusMetricsService implements OnModuleInit {
   private readonly registry = new Registry();
 
   private readonly counters = new Map<PipelineMetricName, Counter>();
 
-  constructor(private readonly pipelineMetricsService: PipelineMetricsService) {
+  constructor(
+    private readonly pipelineMetricsService: PipelineMetricsService,
+  ) {}
+
+  onModuleInit(): void {
     for (const definition of PIPELINE_METRIC_DEFINITIONS) {
       const counter = new Counter({
         name: definition.name,

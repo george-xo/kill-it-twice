@@ -1,6 +1,9 @@
 import type { QueryResultRow } from 'pg';
 
-export type SimulatedDestination = 'elasticsearch' | 'rabbitmq';
+import type { CustomerStatus } from '../../pipeline/contracts/customer-change-event.contract.js';
+import type { DeliveryDestination } from '../../pipeline/contracts/failed-customer-change-event.contract.js';
+
+export type SimulatedDestination = DeliveryDestination;
 
 export interface SimulationStateRow extends QueryResultRow {
   elasticsearch_failure_enabled: boolean;
@@ -23,14 +26,14 @@ export interface SimulationState {
 
 export interface SimulatedCustomerChangeRow extends QueryResultRow {
   id: string;
-  status: 'active' | 'inactive';
+  status: CustomerStatus;
   version: string;
   updated_at: Date;
 }
 
 export interface SimulatedCustomerChange {
   id: string;
-  status: 'active' | 'inactive';
+  status: CustomerStatus;
   version: number;
   updatedAt: string;
 }

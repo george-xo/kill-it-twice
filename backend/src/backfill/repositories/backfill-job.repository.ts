@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { QueryResultRow } from 'pg';
 
-import { DatabaseService } from '../database/database.service.js';
-import type { BackfillJobRow } from './models/backfill-job.model.js';
+import { DatabaseService } from '../../database/database.service.js';
+import type { BackfillJobRow } from '../models/backfill-job.model.js';
 
 interface StopRequestedRow extends QueryResultRow {
   stop_requested: boolean;

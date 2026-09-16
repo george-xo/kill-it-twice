@@ -1,7 +1,13 @@
 export type JsonValue =
   string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
-export type CustomerStatus = 'active' | 'inactive';
+export const CUSTOMER_STATUSES = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+} as const;
+
+export type CustomerStatus =
+  (typeof CUSTOMER_STATUSES)[keyof typeof CUSTOMER_STATUSES];
 
 export type CustomerOperation = 'INSERT' | 'UPDATE' | 'DELETE';
 

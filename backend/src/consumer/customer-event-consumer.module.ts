@@ -4,7 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '../database/database.module.js';
 import { RabbitMqModule } from '../destinations/rabbitmq/rabbitmq.module.js';
 import { CustomerEventConsumerService } from './customer-event-consumer.service.js';
-import { CustomerEventIdempotencyRepository } from './customer-event-idempotency.repository.js';
+import { CustomerEventIdempotencyRepository } from './repositories/customer-event-idempotency.repository.js';
 import { PipelineMetricsModule } from '../observability/pipeline-metrics.module.js';
 
 @Module({

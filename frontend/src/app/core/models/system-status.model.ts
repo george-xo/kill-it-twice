@@ -18,21 +18,21 @@ export interface WorkerState {
 export interface PipelineCounters {
   deliveredEvents: number;
   elasticsearchRetries: number;
-  rabbitmqRetries: number;
+  rabbitMqRetries: number;
   processedEvents: number;
   duplicateEvents: number;
   deadLetterEvents: number;
 }
 
 export interface PipelineStatus {
-  sourceRecordCount: number;
-  latestChangeId: number;
-  processedChangeId: number;
-  incrementalLag: number;
-  throughputPerSecond: number;
-  counters: PipelineCounters;
-  mainQueueMessageCount: number;
-  deadLetterQueueMessageCount: number;
+  sourceRecordCount: number | null;
+  latestChangeId: number | null;
+  processedChangeId: number | null;
+  incrementalLag: number | null;
+  throughputPerSecond: number | null;
+  counters: PipelineCounters | null;
+  mainQueueMessageCount: number | null;
+  deadLetterQueueMessageCount: number | null;
 }
 
 export interface SystemStatus {
@@ -46,8 +46,8 @@ export interface SystemStatus {
   };
 
   workers: {
-    backfill: WorkerState;
-    incrementalSync: WorkerState;
+    backfill: WorkerState | null;
+    incrementalSync: WorkerState | null;
   };
 
   pipeline: PipelineStatus;

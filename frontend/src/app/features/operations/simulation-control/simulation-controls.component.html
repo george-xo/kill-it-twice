@@ -43,7 +43,11 @@
 
           <p>
             Failure:
-            {{ state.destinations.elasticsearch.failureEnabled ? 'enabled' : 'disabled' }}
+            {{
+              state.destinations.elasticsearch.failureEnabled
+                ? simulationLabels.FAILURE_ENABLED
+                : simulationLabels.FAILURE_DISABLED
+            }}
           </p>
         </div>
 
@@ -52,7 +56,7 @@
             mat-flat-button
             type="button"
             [disabled]="isBusy() || state.destinations.elasticsearch.failureEnabled"
-            (click)="failDestination('elasticsearch')"
+            (click)="failDestination(simulationDestinations.ELASTICSEARCH)"
           >
             Simulate failure
           </button>
@@ -61,7 +65,7 @@
             mat-stroked-button
             type="button"
             [disabled]="isBusy() || !state.destinations.elasticsearch.failureEnabled"
-            (click)="recoverDestination('elasticsearch')"
+            (click)="recoverDestination(simulationDestinations.ELASTICSEARCH)"
           >
             Recover
           </button>
@@ -76,7 +80,11 @@
 
           <p>
             Failure:
-            {{ state.destinations.rabbitmq.failureEnabled ? 'enabled' : 'disabled' }}
+            {{
+              state.destinations.rabbitmq.failureEnabled
+                ? simulationLabels.FAILURE_ENABLED
+                : simulationLabels.FAILURE_DISABLED
+            }}
           </p>
         </div>
 
@@ -85,7 +93,7 @@
             mat-flat-button
             type="button"
             [disabled]="isBusy() || state.destinations.rabbitmq.failureEnabled"
-            (click)="failDestination('rabbitmq')"
+            (click)="failDestination(simulationDestinations.RABBITMQ)"
           >
             Simulate failure
           </button>
@@ -94,7 +102,7 @@
             mat-stroked-button
             type="button"
             [disabled]="isBusy() || !state.destinations.rabbitmq.failureEnabled"
-            (click)="recoverDestination('rabbitmq')"
+            (click)="recoverDestination(simulationDestinations.RABBITMQ)"
           >
             Recover
           </button>
@@ -108,10 +116,11 @@
           <span class="simulation-controls__label"> Customer change </span>
 
           <h3>Toggle customer status</h3>
+
           <p>Create a real customer UPDATE event.</p>
         </div>
 
-        <form class="simulation-controls__customer-form" (ngSubmit)="toggleCustomerStatus()">
+        <div class="simulation-controls__customer-form">
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Customer ID</mat-label>
 
@@ -122,8 +131,15 @@
             }
           </mat-form-field>
 
-          <button mat-flat-button type="submit" [disabled]="isBusy()">Toggle status</button>
-        </form>
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="isBusy()"
+            (click)="toggleCustomerStatus()"
+          >
+            Toggle status
+          </button>
+        </div>
 
         @if (lastCustomerChange(); as customerChange) {
           <p class="simulation-controls__result">
@@ -138,6 +154,7 @@
           <span class="simulation-controls__label"> Failed event </span>
 
           <h3>Create poison change</h3>
+
           <p>Create an intentionally invalid change for DLQ testing.</p>
         </div>
 
@@ -160,6 +177,6 @@
       </article>
     </div>
   } @else {
-    <p>Loading simulation state...</p>
+    <p>{{ simulationLabels.LOADING_STATE }}</p>
   }
 </section>

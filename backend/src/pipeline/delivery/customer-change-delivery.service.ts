@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 import { ElasticsearchService } from '../../destinations/elasticsearch/elasticsearch.service.js';
 import { RabbitMqService } from '../../destinations/rabbitmq/rabbitmq.service.js';
-import { PIPELINE_METRICS } from '../../observability/pipeline-metrics.constants.js';
-import { PipelineMetricsService } from '../../observability/pipeline-metrics.service.js';
+import { PIPELINE_METRICS } from '../../observability/constants/pipeline-metrics.constants.js';
+import { PipelineMetricsService } from '../../observability/services/pipeline-metrics.service.js';
 import { DestinationRetryService } from '../../resilience/destination-retry.service.js';
 import { SimulationService } from '../../simulation/simulation.service.js';
 import type { CustomerChangeEvent } from '../contracts/customer-change-event.contract.js';

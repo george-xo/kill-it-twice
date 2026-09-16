@@ -201,11 +201,12 @@ test_entity_ids="$(
 )"
 
 documents="$(
-  curl -fsS \
-    -H 'Content-Type: application/json' \
-    -X POST \
-    http://localhost:9200/customers/_mget \
-    --data-binary "{\"ids\":${test_entity_ids}}"
+  printf '{"ids":%s}' "${test_entity_ids}" |
+    curl -fsS \
+      -H 'Content-Type: application/json' \
+      -X POST \
+      --data-binary @- \
+      http://localhost:9200/customers/_mget
 )"
 
 successful_document_count="$(

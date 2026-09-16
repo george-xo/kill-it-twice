@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { DELIVERY_DESTINATIONS } from '../pipeline/contracts/failed-customer-change-event.contract.js';
 import type {
   PoisonChangeResult,
   SimulatedCustomerChange,
@@ -112,7 +113,10 @@ export class SimulationService {
   }
 
   private parseDestination(value: string): SimulatedDestination {
-    if (value !== 'elasticsearch' && value !== 'rabbitmq') {
+    if (
+      value !== DELIVERY_DESTINATIONS.ELASTICSEARCH &&
+      value !== DELIVERY_DESTINATIONS.RABBITMQ
+    ) {
       throw new BadRequestException(
         'Destination must be either "elasticsearch" or "rabbitmq"',
       );

@@ -1,104 +1,221 @@
 # Kill It Twice
 
-ამ ეტაპზე პროექტი დაგეგმვის პროცესშია მანამ კოდის წერაზე გადავალ. რადგან პირდაპირი კომუნიკაცია არ მაქვს სჯობს თავიდანვე დავაფიქსირო თუ როგორ გავიგე დავალება, რა გადაწყვეტილებები მივიღე დასაწყისშივე და როგორ ვაპირებ მუშაობის გაგრძელებას. შესაძლებელია ზოგი ტექნიკური გადაწყვეტილება პროცესში შეიცვალოს და ასეთ ცვლილებებს და მათ მიზეზებს ცალკე აღვწერ.
+ეს არის პროექტის საბოლოო ვერსია. PostgreSQL-ის customer მონაცემები სინქრონიზდება Elasticsearch-სა და RabbitMQ-ში და დამუშავებულია crash recovery, idempotency, retry, DLQ და observability.
 
-## როგორ გავიაზრე დავალების არსი
+დროის სიმცირის გამო ვეღარ მოვასწარი დარჩენილი code smell-ების გასწორება, დამატებითი refactoring და სრულყოფილი test coverage. პროექტის ძირითადი ფუნქციონალი და ხუთივე verification gate მუშაობს.
 
-უნდა ავაწყო მონაცემების სინქრონიზაციის სისტემა, რომელიც დატას ბაზიდან წაიკითხავს და elasticsearch-სა და RabbitMQ-ში გააგზავნის
+## მოთხოვნები
 
-1. Elasticsearch-ში სადაც ჩანაწერების მიმდინარე მდგომარეობა შეინახება და მოძებნადი იქნება
-2. RabbitMQ-ში, საიდანაც მოვლენებს დამოუკიდებელი Consumer მიიღებს
+პროექტის გასაშვებად საჭიროა:
 
-Pipeline-ს ექნება მუშაობის ორი რეჟიმი:
+- Git;
+- Docker Desktop ჩართული Docker Compose v2-ით;
+- Node.js 24;
+- npm;
+- Bash;
+- curl.
 
-- Backfill - სორსში უკვე არსებული მონაცემების პირველადი გადატანა
-- Incremental sync - ბექფილის დაწყების შემდეგ, მონაცემების მუდმივი დამუშავება
+GNU Make აუცილებელი არ არის. თუ Make უკვე გაქვთ დაყენებული, შეგიძლიათ გამოიყენოთ `make install`, `make setup`, `make start` და `make verify`. წინააღმდეგ შემთხვევაში იგივე მოქმედებები გაუშვით შესაბამისი `bash ./scripts/...` ბრძანებებით.
 
-ორივე რეჟიმმა პარალელურად უნდა იმუშავოს
+პროექტზე macOS გარემოში ვმუშაობდი და Windows-ზე მისი სრულად შემოწმების საშუალება არ მქონდა. ამიტომ README-ში აღწერილია ორივე ვარიანტი: Make ბრძანებები macOS/Linux გარემოსთვის და პირდაპირი Bash scripts Windows Git Bash-ისთვის.
 
-დავალების მთავარი არსია მონაცემების უსაფრთხოდ გადატანა ისე, რომ პროცესი სწორად გაგრძელდეს მოულოდნელი გათიშვის, elasticsearch-ის ან RabbitMQ-ის შეფერხების, დუბლირებული ჩანაწერებისა და batch-ის ნაწილობრივი შეცდომის შემთხვევაშიც
-და აუცილებელია ყველა ეს სცენარი ავტომატურად შემოწმდეს "make verify" კომანდით
+## სწრაფი გაშვება
 
-## არჩეული ტექნოლოგიები
+| ნაბიჯი          | Make                    | Bash / Windows Git Bash                   |
+| --------------- | ----------------------- | ----------------------------------------- |
+| 1. Dependencies | `make install`          | `bash ./scripts/install.sh`               |
+| 2. Setup        | `make setup COUNT=1000` | `SEED_COUNT=1000 bash ./scripts/setup.sh` |
+| 3. Start        | `make start`            | `bash ./scripts/start.sh`                 |
+| 4. Verification | `make verify`           | `bash ./scripts/verify.sh`                |
 
-საწყის ეტაპზე ავირჩიე შემდეგი ტექნოლოგიები:
+Bash ბრძანებები მუშაობს macOS-ზე, Linux-ზე და Windows Git Bash-ში.
 
-- BE - NestJS
-- FE — Angular
-- Source database — PostgreSQL
-- Search index — Elasticsearch
-- Event broker — RabbitMQ
-- Run env — Docker Compose
+## ინდივიდუალური Gate-ების გაშვება
 
-Angular და TypeScript ჩემი ძირითადი სტეკია. დროის ეფექტურად გამოყენებისთვის ბექსაც ნესტით დავწერ(TS)
+სრული verification-ის ნაცვლად შესაძლებელია თითოეული Gate-ის ცალ-ცალკე გაშვებაც.
 
-## მონაცემების მიწოდება
+| Gate                              | Make             | Bash / Windows Git Bash       |
+| --------------------------------- | ---------------- | ----------------------------- |
+| G1 — Backfill crash recovery      | `make verify-g1` | `bash ./scripts/verify-g1.sh` |
+| G2 — Duplicate handling           | `make verify-g2` | `bash ./scripts/verify-g2.sh` |
+| G3 — Destination recovery         | `make verify-g3` | `bash ./scripts/verify-g3.sh` |
+| G4 — Partial batch failure და DLQ | `make verify-g4` | `bash ./scripts/verify-g4.sh` |
+| G5 — Observability                | `make verify-g5` | `bash ./scripts/verify-g5.sh` |
 
-Pipeline გამოიყენებს at-least-once delivery მიდგომას. მონაცემები რომ არ დაიკარგოს თუმცა შესაძლოა განმეორებით გაიგზავნოს
-თუმცა იმისთვის რომ თავიდან ავირიდო დუპლიკატები ელასტიკსერჩი გამოიყენებს უცვლელ ID da ვერსიას (ფლეგს) და rabbitmq cunsomer ამ ივენთს მეორედ აღარ დაამუშავებს
-საბოლოო ჯამში გამოვა effectively-once
+ყველა ბრძანება repository-ის root დირექტორიიდან უნდა გაეშვას.
 
-## სამუშაოს დაყოფა ტასკებად
+---
 
-![Pull Request Roadmap](./kill-it-twice.png)
+Setup ავტომატურად:
 
-პროექტს ცალკე ეტაპებად დავყოფ შემდეგი პრინციპით: ერთი branch, ერთი Pull Request და ერთი commit
+- შექმნის `.env` ფაილს;
+- ააწყობს Docker image-ებს;
+- გაუშვებს PostgreSQL-ს, Elasticsearch-სა და RabbitMQ-ს;
+- შეასრულებს database migrations-ს;
+- შექმნის 1,000 customer-ს;
+- მოამზადებს Elasticsearch index-სა და RabbitMQ topology-ს;
+- გაუშვებს საწყის Backfill-ს.
 
-პულ რექვესთები ერთმანეთზე თანმიმდევრულად იქნება მიბმული მაგალითად პირველი PR > main branch, მეორე PR > პირველი ბრენჩი, მესამე PR > მეორე ბრენჩი და ა.შ.
-
-თით`ეული ბრენჩი მოიცავს ერთ კონკრეტულ ტექნიკურ ცვლილებას, შესაბამის სპეც და რიდმიში საჭირო განახლებებს. კომიტების ისტორიაში გამოჩნდება დეველოპმენტის ყველა ნაბიჯი და გადაწყვეტილებები
-
-საწყისი PR-ების გეგმაა
-
-1. საწყისი SPEC და repository-ის წესები
-2. პროექტისა და Docker მომზადება
-3. Source database და მონაცემების გენერაცია
-4. მონაცემების Elasticsearch-სა და RabbitMQCHANT-ში გაგზავნა (საწყისი საფუძველი)
-5. G1- Backfill-ის აღდგენა crash-ის შემდეგ
-6. incremental sync-ის გაშვება ბექფილის პარალელურად
-7. G2 — დუბლიკატების დამუშავება
-8. G3 — მიმღები სისტემის ჩავარდნა და ავტომატური აღდგენა
-9. G4 — ნაწილობრივ ჩავარდნილი batch და DLQ
-10. მართვის API და Angular UI
-11. G5 — მეტრიკები, ლოგები და სისტემის მდგომარეობა
-12. საბოლოო make verify
-
-ეს სია საწყისი გეგმაა. თუ მუშაობისას გამოჩნდება, რომ რომელიმე ნაწილი სხვაგვარად უნდა გაიყოს, ცვლილებას და მის მიზეზს დავაფიქსირებ.
-
-## საბოლოო ბრძანებები
-
-დასრულებულ პროექტში მთელი სისტემა უნდა გაეშვას შემდეგი ბრძანებით:
+სხვა რაოდენობის მონაცემისთვის შეცვალეთ `1000`, მაგალითად:
 
 ```bash
-docker compose up --build
+SEED_COUNT=10000 bash ./scripts/setup.sh
 ```
 
-საწყისი მონაცემების შექმნა:
+> Setup development მონაცემებს თავიდან ამზადებს.
+
+### 3. აპლიკაციის გაშვება
+
+Make:
 
 ```bash
-make seed
+make start
 ```
 
-ხუთივე Gate-ის ავტომატური შემოწმება:
+Bash:
+
+```bash
+bash ./scripts/start.sh
+```
+
+აპლიკაციის მისამართები:
+
+- Frontend: [http://localhost:8080](http://localhost:8080)
+- Backend: [http://localhost:3000](http://localhost:3000)
+- Health: [http://localhost:3000/health](http://localhost:3000/health)
+- System status: [http://localhost:3000/status](http://localhost:3000/status)
+- RabbitMQ Management: [http://localhost:15672](http://localhost:15672)
+
+## Verification
+
+სრული verification:
+
+Make:
 
 ```bash
 make verify
 ```
 
-## AI გამოყენება
+Bash / Windows Git Bash:
 
-აგენტს კოდის დასაწერად არ ვიყენებ, მაგრამ ვიყენებ ჩატს ყველა კითხვის დასასმელად და სწორი პასუხების მიღება/გარჩევისთვის.
+```bash
+bash ./scripts/verify.sh
+```
 
-შეიძლება ამ მიდგომით მეტი დრო მეხარჯება, მაგრამ მინდა ზუსად ვიცოდე პროექტში სად რა მიწერა და რა მიზეზით.
+Verification რამდენიმე წუთს მოითხოვს, სატესტო გარემოს თავიდან ამზადებს და ხუთივე reliability gate-ს ამოწმებს:
 
-ამ მიდგომით მომავალში შემიმცირდება დრო ბაგების საპოვნელად თუ კოდის რეფაქტორინგისთვის
+- G1 — Backfill crash recovery;
+- G2 — duplicate event handling;
+- G3 — destination outage recovery;
+- G4 — partial batch failure და DLQ;
+- G5 — observability.
 
-## რას არ ვწერ წინასწარ
+წარმატებული შედეგი:
 
-- სქემას და მონაცემების მოძრაობის გზას
-- რა ტექნიკური გადაწყვეტილებები მივიღე და რატო
-- make verify ბრძანების ბოლო შედეგებს
-- რამდენად სწრაფად მუშაობს სისტემა ან რატომ არის ნელი
-- რომელი ფუნქციები არ გავაკეთე და რატომ
-- რა შეიცვალა საწყის გეგმასთან შედარებით ან რატომ ვერ ვასწრებ რომელიმე გეითის დახურვას
-- სად არ მომეწონა ჩატის შემოთავაზება და როგორ შევცვალე
+```text
+Verification report
+============================================================
+G1 resume after kill ............ PASS
+G2 no duplicates ................ PASS
+G3 sink outage .................. PASS
+G4 partial batch failure ........ PASS
+G5 observability ................ PASS
+```
+
+## ინდივიდუალური Gate-ები
+
+### G1 — Backfill crash recovery
+
+```bash
+bash ./scripts/verify-g1.sh
+```
+
+### G2 — Duplicate handling
+
+```bash
+bash ./scripts/verify-g2.sh
+```
+
+### G3 — Destination recovery
+
+```bash
+bash ./scripts/verify-g3.sh
+```
+
+### G4 — Partial batch failure და DLQ
+
+```bash
+bash ./scripts/verify-g4.sh
+```
+
+### G5 — Observability
+
+```bash
+bash ./scripts/verify-g5.sh
+```
+
+Make-ის გამოყენების შემთხვევაში იგივე Gate-ები ასე ეშვება:
+
+```bash
+make verify-g1
+make verify-g2
+make verify-g3
+make verify-g4
+make verify-g5
+```
+
+## პროექტის ფუნქციონალი
+
+პროექტი მოიცავს:
+
+- crash-resumable Backfill processing-ს;
+- უწყვეტ Incremental Sync-ს;
+- Elasticsearch-სა და RabbitMQ-ში event delivery-ს;
+- retry-სა და destination recovery-ს;
+- idempotent RabbitMQ consumer-ს;
+- partial batch failure isolation-ს;
+- Dead-letter queue-სა და replay-ს;
+- metrics, health და system status endpoint-ებს;
+- Angular dashboard-ს customer-ების, worker-ებისა და failure simulation-ის სამართავად.
+
+## მონაცემების დამუშავების Flow
+
+```mermaid
+flowchart LR
+    PostgreSQL[(PostgreSQL Source)]
+
+    PostgreSQL --> Backfill[Backfill Worker]
+    PostgreSQL --> Incremental[Incremental Sync Worker]
+
+    Backfill --> Pipeline[Delivery Pipeline]
+    Incremental --> Pipeline
+
+    Pipeline --> Elasticsearch[(Elasticsearch)]
+    Pipeline --> RabbitMQ[(RabbitMQ)]
+
+    Pipeline -->|Retry attempts failed| DLQ[(Dead-letter Queue)]
+
+    RabbitMQ --> Consumer[Idempotent Consumer]
+    Consumer --> Processed[(Processed Events)]
+```
+
+- **Backfill** ამუშავებს საწყის customer snapshot-ს.
+- **Incremental Sync** ამუშავებს ახალ ცვლილებებს.
+- ორივე worker იყენებს ერთსა და იმავე delivery pipeline-ს.
+- მონაცემები იგზავნება Elasticsearch-სა და RabbitMQ-ში.
+- წარუმატებელი event-ები retry-ის შემდეგ გადადის DLQ-ში.
+- RabbitMQ Consumer დუბლირებულ event-ებს idempotently ამუშავებს.
+
+## გაჩერება
+
+Make:
+
+```bash
+make stop
+```
+
+Make-ის გარეშე:
+
+```bash
+docker compose down
+```

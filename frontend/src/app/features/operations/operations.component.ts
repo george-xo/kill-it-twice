@@ -11,17 +11,25 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import type { Observable } from 'rxjs';
-import { finalize } from 'rxjs';
+import { filter, finalize, type Observable, switchMap, take, tap, timeout, timer } from 'rxjs';
 
+import {
+  SHARED_DISPLAY_LABELS,
+  WORKER_STATUSES,
+} from '../../core/constants/system-status.constants';
 import type { SystemStatus } from '../../core/models/system-status.model';
 import { SystemStatusApiService } from '../../core/services/system-status-api.service';
 import {
   createDlqReplayFailureMessage,
   createDlqReplaySuccessMessage,
   DEFAULT_DLQ_REPLAY_LIMIT,
+  DLQ_REPLAY_TIMEOUT_MS,
   MAX_DLQ_REPLAY_LIMIT,
+  OPERATIONS_LABELS,
   OPERATIONS_MESSAGES,
+  WORKER_NAMES,
+  WORKER_STATUS_POLL_INTERVAL_MS,
+  WORKER_STATUS_TIMEOUT_MS,
 } from './constants/operations.constants';
 import type { DeadLetterReplayResponse, WorkerCommandResponse } from './models/operation.model';
 import { OperationsApiService } from './services/operations-api.service';
@@ -30,10 +38,10 @@ import { SimulationControlsComponent } from './simulation-control/simulation-con
 @Component({
   selector: 'app-operations',
   imports: [
-    ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
+    ReactiveFormsModule,
     SimulationControlsComponent,
   ],
   templateUrl: './operations.component.html',
@@ -42,14 +50,23 @@ import { SimulationControlsComponent } from './simulation-control/simulation-con
 })
 export class OperationsComponent implements OnInit {
   private readonly operationsApiService = inject(OperationsApiService);
+
   private readonly systemStatusApiService = inject(SystemStatusApiService);
+
   private readonly destroyRef = inject(DestroyRef);
 
+  protected readonly workerStatuses = WORKER_STATUSES;
+  protected readonly displayLabels = SHARED_DISPLAY_LABELS;
+  protected readonly operationLabels = OPERATIONS_LABELS;
+
   protected readonly systemStatus = signal<SystemStatus | null>(null);
+
   protected readonly isBusy = signal(false);
   protected readonly isReplaying = signal(false);
   protected readonly successMessage = signal<string | null>(null);
   protected readonly errorMessage = signal<string | null>(null);
+
+  protected readonly maximumDlqReplayLimit = MAX_DLQ_REPLAY_LIMIT;
 
   protected readonly replayLimit = new FormControl(DEFAULT_DLQ_REPLAY_LIMIT, {
     nonNullable: true,
@@ -94,6 +111,7 @@ export class OperationsComponent implements OnInit {
     this.operationsApiService
       .replayDeadLetterQueue(this.replayLimit.getRawValue())
       .pipe(
+        timeout(DLQ_REPLAY_TIMEOUT_MS),
         finalize(() => {
           this.isBusy.set(false);
           this.isReplaying.set(false);
@@ -137,20 +155,57 @@ export class OperationsComponent implements OnInit {
 
     request
       .pipe(
+        tap(() => {
+          this.successMessage.set(OPERATIONS_MESSAGES.WORKER_REQUEST_ACCEPTED);
+        }),
+        switchMap((response) => this.waitForWorkerState(response)),
         finalize(() => {
           this.isBusy.set(false);
         }),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: (response) => {
-          this.updateWorkerState(response);
-          this.successMessage.set(OPERATIONS_MESSAGES.WORKER_UPDATED);
+        next: (status) => {
+          this.systemStatus.set(status);
         },
         error: () => {
           this.errorMessage.set(OPERATIONS_MESSAGES.WORKER_UPDATE_FAILED);
         },
       });
+  }
+
+  private waitForWorkerState(response: WorkerCommandResponse): Observable<SystemStatus> {
+    return timer(0, WORKER_STATUS_POLL_INTERVAL_MS).pipe(
+      switchMap(() => this.systemStatusApiService.getSystemStatus()),
+      filter((status) => this.hasWorkerReachedRequestedState(status, response)),
+      take(1),
+      timeout(WORKER_STATUS_TIMEOUT_MS),
+    );
+  }
+
+  private hasWorkerReachedRequestedState(
+    status: SystemStatus,
+    response: WorkerCommandResponse,
+  ): boolean {
+    const worker =
+      response.worker === WORKER_NAMES.BACKFILL
+        ? status.workers.backfill
+        : status.workers.incrementalSync;
+
+    if (!worker) {
+      return false;
+    }
+
+    if (
+      response.worker === WORKER_NAMES.BACKFILL &&
+      response.requestedState === WORKER_STATUSES.RUNNING
+    ) {
+      return (
+        worker.status === WORKER_STATUSES.RUNNING || worker.status === WORKER_STATUSES.COMPLETED
+      );
+    }
+
+    return worker.status === response.requestedState;
   }
 
   private prepareRequest(): void {
@@ -169,26 +224,6 @@ export class OperationsComponent implements OnInit {
     }
 
     this.successMessage.set(createDlqReplaySuccessMessage(response.replayed, response.remaining));
-  }
-
-  private updateWorkerState(response: WorkerCommandResponse): void {
-    this.systemStatus.update((status) => {
-      if (!status) {
-        return null;
-      }
-
-      return {
-        ...status,
-        workers: {
-          ...status.workers,
-          [response.worker]: {
-            ...status.workers[response.worker],
-            status: response.requestedState,
-            stopRequested: response.requestedState === 'stopped',
-          },
-        },
-      };
-    });
   }
 
   private updateDeadLetterQueue(response: DeadLetterReplayResponse): void {

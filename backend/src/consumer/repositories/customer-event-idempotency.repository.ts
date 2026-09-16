@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '../database/database.service.js';
-import type { CustomerChangeEvent } from '../pipeline/contracts/customer-change-event.contract.js';
+import { DatabaseService } from '../../database/database.service.js';
+import type { CustomerChangeEvent } from '../../pipeline/contracts/customer-change-event.contract.js';
 
 @Injectable()
 export class CustomerEventIdempotencyRepository {

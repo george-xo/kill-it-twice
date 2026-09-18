@@ -65,11 +65,12 @@ count_missing_elasticsearch_records() {
     "
   )"
 
-  curl -fsS \
-    -X POST \
-    -H 'Content-Type: application/json' \
-    --data-binary "{\"ids\":${source_ids_json}}" \
-    http://localhost:9200/customers/_mget |
+  printf '{"ids":%s}' "${source_ids_json}" |
+    curl -fsS \
+      -X POST \
+      -H 'Content-Type: application/json' \
+      --data-binary @- \
+      http://localhost:9200/customers/_mget |
     awk -F'"found":false' '
       {
         missing_count += NF - 1

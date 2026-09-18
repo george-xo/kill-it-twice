@@ -20,8 +20,10 @@
 
       <mat-select formControlName="status">
         <mat-option value="">All statuses</mat-option>
-        <mat-option value="active">Active</mat-option>
-        <mat-option value="inactive">Inactive</mat-option>
+
+        <mat-option [value]="customerStatuses.ACTIVE"> Active </mat-option>
+
+        <mat-option [value]="customerStatuses.INACTIVE"> Inactive </mat-option>
       </mat-select>
     </mat-form-field>
 
@@ -77,7 +79,7 @@
           <td mat-cell *matCellDef="let customer">
             <span
               class="customers__status"
-              [class.customers__status--active]="customer.status === 'active'"
+              [class.customers__status--active]="customer.status === customerStatuses.ACTIVE"
             >
               {{ customer.status }}
             </span>
@@ -113,7 +115,7 @@
     @if (nextCursor()) {
       <div class="customers__pagination">
         <button mat-stroked-button type="button" [disabled]="loading()" (click)="loadMore()">
-          {{ loading() ? 'Loading...' : 'Load more' }}
+          {{ loading() ? customerLabels.LOADING : customerLabels.LOAD_MORE }}
         </button>
       </div>
     }

@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import type { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../../../core/config/api.config';
+import { DEFAULT_CUSTOMERS_PAGE_SIZE } from '../constants/customers.constants';
 import type {
   Customer,
   CustomerListResponse,
@@ -15,23 +16,26 @@ import type {
 export class CustomersApiService {
   private readonly httpClient = inject(HttpClient);
 
-  getCustomers(searchParams: CustomerSearchParams = {}): Observable<CustomerListResponse> {
-    let httpParams = new HttpParams().set('limit', searchParams.limit ?? 25);
+  getCustomers(searchParameters: CustomerSearchParams = {}): Observable<CustomerListResponse> {
+    let httpParameters = new HttpParams().set(
+      'limit',
+      searchParameters.limit ?? DEFAULT_CUSTOMERS_PAGE_SIZE,
+    );
 
-    if (searchParams.query) {
-      httpParams = httpParams.set('query', searchParams.query);
+    if (searchParameters.query) {
+      httpParameters = httpParameters.set('query', searchParameters.query);
     }
 
-    if (searchParams.status) {
-      httpParams = httpParams.set('status', searchParams.status);
+    if (searchParameters.status) {
+      httpParameters = httpParameters.set('status', searchParameters.status);
     }
 
-    if (searchParams.cursor) {
-      httpParams = httpParams.set('cursor', searchParams.cursor);
+    if (searchParameters.cursor) {
+      httpParameters = httpParameters.set('cursor', searchParameters.cursor);
     }
 
     return this.httpClient.get<CustomerListResponse>(`${API_BASE_URL}/customers`, {
-      params: httpParams,
+      params: httpParameters,
     });
   }
 

@@ -11,11 +11,12 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import type { Observable } from 'rxjs';
-import { finalize } from 'rxjs';
+import { finalize, type Observable } from 'rxjs';
 
 import {
   DEFAULT_SIMULATION_CUSTOMER_ID,
+  SIMULATION_DESTINATIONS,
+  SIMULATION_LABELS,
   SIMULATION_MESSAGES,
 } from '../constants/simulation.constants';
 import type {
@@ -28,7 +29,7 @@ import { SimulationApiService } from '../services/simulation-api.service';
 
 @Component({
   selector: 'app-simulation-controls',
-  imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule],
+  imports: [MatButtonModule, MatFormFieldModule, MatInputModule, ReactiveFormsModule],
   templateUrl: './simulation-controls.component.html',
   styleUrl: './simulation-controls.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,6 +38,10 @@ export class SimulationControlsComponent implements OnInit {
   private readonly simulationApiService = inject(SimulationApiService);
 
   private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly simulationDestinations = SIMULATION_DESTINATIONS;
+
+  protected readonly simulationLabels = SIMULATION_LABELS;
 
   protected readonly simulationState = signal<SimulationState | null>(null);
 

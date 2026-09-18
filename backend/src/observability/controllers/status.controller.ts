@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 
 import type { SystemStatus } from '../models/system-status.model.js';
-import { SystemStatusService } from '../system-status.service.js';
+import { SystemStatusService } from '../services/system-status.service.js';
 
 @Controller('status')
 export class StatusController {

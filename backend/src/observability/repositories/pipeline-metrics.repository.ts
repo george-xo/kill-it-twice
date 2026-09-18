@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '../database/database.service.js';
+import { DatabaseService } from '../../database/database.service.js';
 import type {
   PipelineMetric,
   PipelineMetricRow,
-} from './models/pipeline-metric.model.js';
-import type { PipelineMetricName } from './pipeline-metrics.constants.js';
+} from '../models/pipeline-metric.model.js';
+import type { PipelineMetricName } from '../constants/pipeline-metrics.constants.js';
 
 @Injectable()
 export class PipelineMetricsRepository {

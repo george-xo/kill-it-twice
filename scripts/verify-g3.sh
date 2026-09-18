@@ -65,19 +65,19 @@ read_rabbitmq_message_count() {
     tr -d '[:space:]'
 }
 
-current_time_ms() {
-  node -e 'process.stdout.write(String(Date.now()))'
+current_time_seconds() {
+  date +%s
 }
 
 calculate_elapsed_seconds() {
-  local started_at_ms="$1"
-  local completed_at_ms="$2"
+  local started_at_seconds="$1"
+  local completed_at_seconds="$2"
 
   awk \
-    -v started_at_ms="${started_at_ms}" \
-    -v completed_at_ms="${completed_at_ms}" \
+    -v started_at_seconds="${started_at_seconds}" \
+    -v completed_at_seconds="${completed_at_seconds}" \
     'BEGIN {
-      printf "%.1f", (completed_at_ms - started_at_ms) / 1000
+      printf "%.1f", completed_at_seconds - started_at_seconds
     }'
 }
 
@@ -199,18 +199,18 @@ if [[ "${checkpoint_while_elasticsearch_down}" != "${initial_checkpoint}" ]]; th
   fail "Checkpoint advanced while Elasticsearch was unavailable"
 fi
 
-elasticsearch_recovery_started_at_ms="$(current_time_ms)"
+elasticsearch_recovery_started_at_seconds="$(current_time_seconds)"
 
 docker compose up -d --wait elasticsearch >/dev/null
 
 wait_for_checkpoint "$((RECORD_COUNT + 1))"
 
-elasticsearch_recovery_completed_at_ms="$(current_time_ms)"
+elasticsearch_recovery_completed_at_seconds="$(current_time_seconds)"
 
 elasticsearch_recovery_seconds="$(
   calculate_elapsed_seconds \
-    "${elasticsearch_recovery_started_at_ms}" \
-    "${elasticsearch_recovery_completed_at_ms}"
+    "${elasticsearch_recovery_started_at_seconds}" \
+    "${elasticsearch_recovery_completed_at_seconds}"
 )"
 
 elasticsearch_checkpoint="$(read_checkpoint)"
@@ -248,19 +248,19 @@ if [[ "${checkpoint_while_rabbitmq_down}" != "${elasticsearch_checkpoint}" ]]; t
   fail "Checkpoint advanced while RabbitMQ was unavailable"
 fi
 
-rabbitmq_recovery_started_at_ms="$(current_time_ms)"
+rabbitmq_recovery_started_at_seconds="$(current_time_seconds)"
 
 docker compose up -d --wait rabbitmq >/dev/null
 
 wait_for_checkpoint "$((RECORD_COUNT + 2))"
 wait_for_consumer
 
-rabbitmq_recovery_completed_at_ms="$(current_time_ms)"
+rabbitmq_recovery_completed_at_seconds="$(current_time_seconds)"
 
 rabbitmq_recovery_seconds="$(
   calculate_elapsed_seconds \
-    "${rabbitmq_recovery_started_at_ms}" \
-    "${rabbitmq_recovery_completed_at_ms}"
+    "${rabbitmq_recovery_started_at_seconds}" \
+    "${rabbitmq_recovery_completed_at_seconds}"
 )"
 
 rabbitmq_checkpoint="$(read_checkpoint)"

@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { PipelineMetric } from './models/pipeline-metric.model.js';
-import type { PipelineMetricName } from './pipeline-metrics.constants.js';
-import { PipelineMetricsRepository } from './pipeline-metrics.repository.js';
+import type { PipelineMetric } from '../models/pipeline-metric.model.js';
+import type { PipelineMetricName } from '../constants/pipeline-metrics.constants.js';
+import { PipelineMetricsRepository } from '../repositories/pipeline-metrics.repository.js';
 
 @Injectable()
 export class PipelineMetricsService {

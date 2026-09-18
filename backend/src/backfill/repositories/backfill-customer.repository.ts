@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service.js';
-import type { BackfillCustomerRow } from './models/backfill-customer-row.model.js';
+import { DatabaseService } from '../../database/database.service.js';
+import type { BackfillCustomerRow } from '../models/backfill-customer-row.model.js';
 
 @Injectable()
 export class BackfillCustomerRepository {

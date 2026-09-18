@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { DatabaseService } from '../database/database.service.js';
 import { CustomerChangeDeliveryService } from '../pipeline/delivery/customer-change-delivery.service.js';
 import {
   BACKFILL_BATCH_DELAY_MS_CONFIG_KEY,
@@ -15,12 +16,13 @@ import {
   CUSTOMER_BACKFILL_JOB_NAME,
   DEFAULT_BACKFILL_BATCH_DELAY_MS,
   DEFAULT_BACKFILL_BATCH_SIZE,
-} from './backfill.constants.js';
-import { BackfillCustomerRepository } from './backfill-customer.repository.js';
-import { BackfillJobRepository } from './backfill-job.repository.js';
+} from './constants/backfill.constants.js';
+import { BackfillCustomerRepository } from './repositories/backfill-customer.repository.js';
+import { BackfillJobRepository } from './repositories/backfill-job.repository.js';
 import { mapBackfillCustomerToEvent } from './mappers/backfill-customer-event.mapper.js';
 
 const BACKFILL_CONTROL_POLL_INTERVAL_MS = 250;
+const BACKFILL_ADVISORY_LOCK_NAME = `backfill:${CUSTOMER_BACKFILL_JOB_NAME}`;
 
 @Injectable()
 export class BackfillService implements OnModuleInit, OnModuleDestroy {
@@ -34,6 +36,7 @@ export class BackfillService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly databaseService: DatabaseService,
     private readonly backfillJobRepository: BackfillJobRepository,
     private readonly backfillCustomerRepository: BackfillCustomerRepository,
     private readonly customerChangeDeliveryService: CustomerChangeDeliveryService,
@@ -69,14 +72,22 @@ export class BackfillService implements OnModuleInit, OnModuleDestroy {
 
   async run(): Promise<void> {
     if (this.running) {
-      throw new Error('Backfill is already running');
+      this.logger.log('Backfill is already running in this process');
+      return;
     }
 
     this.running = true;
     this.shutdownRequested = false;
 
     try {
-      await this.executeBackfill();
+      const lockAcquired = await this.databaseService.tryWithAdvisoryLock(
+        BACKFILL_ADVISORY_LOCK_NAME,
+        () => this.executeBackfill(),
+      );
+
+      if (!lockAcquired) {
+        this.logger.log('Backfill is already controlled by another process');
+      }
     } finally {
       this.running = false;
     }
@@ -84,10 +95,6 @@ export class BackfillService implements OnModuleInit, OnModuleDestroy {
 
   requestStop(): void {
     this.shutdownRequested = true;
-  }
-
-  isRunning(): boolean {
-    return this.running;
   }
 
   onModuleDestroy(): void {

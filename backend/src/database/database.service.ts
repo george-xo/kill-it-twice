@@ -1,6 +1,15 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool, QueryResult, QueryResultRow, PoolClient } from 'pg';
+import {
+  Pool,
+  type PoolClient,
+  type QueryResult,
+  type QueryResultRow,
+} from 'pg';
+
+interface AdvisoryLockRow extends QueryResultRow {
+  acquired: boolean;
+}
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -48,12 +57,60 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await client.query('COMMIT');
 
       return result;
-    } catch (error) {
+    } catch (error: unknown) {
       await client.query('ROLLBACK');
 
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  async tryWithAdvisoryLock(
+    lockName: string,
+    operation: () => Promise<void>,
+  ): Promise<boolean> {
+    if (!this.pool) {
+      throw new Error('Database connection is not initialized');
+    }
+
+    const client = await this.pool.connect();
+    let lockAcquired = false;
+
+    try {
+      const result = await client.query<AdvisoryLockRow>(
+        `
+          SELECT pg_try_advisory_lock(
+            hashtextextended($1, 0)
+          ) AS acquired
+        `,
+        [lockName],
+      );
+
+      lockAcquired = result.rows[0]?.acquired === true;
+
+      if (!lockAcquired) {
+        return false;
+      }
+
+      await operation();
+
+      return true;
+    } finally {
+      try {
+        if (lockAcquired) {
+          await client.query(
+            `
+              SELECT pg_advisory_unlock(
+                hashtextextended($1, 0)
+              )
+            `,
+            [lockName],
+          );
+        }
+      } finally {
+        client.release();
+      }
     }
   }
 

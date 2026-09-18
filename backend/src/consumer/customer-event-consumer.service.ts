@@ -1,12 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import { RabbitMqService } from '../destinations/rabbitmq/rabbitmq.service.js';
-import { PIPELINE_METRICS } from '../observability/pipeline-metrics.constants.js';
-import { PipelineMetricsService } from '../observability/pipeline-metrics.service.js';
+import { PIPELINE_METRICS } from '../observability/constants/pipeline-metrics.constants.js';
+import { PipelineMetricsService } from '../observability/services/pipeline-metrics.service.js';
 import { StructuredLogger } from '../observability/structured-logger.js';
 import type { CustomerChangeEvent } from '../pipeline/contracts/customer-change-event.contract.js';
-import { CUSTOMER_EVENT_CONSUMER_NAME } from './customer-event-consumer.constants.js';
-import { CustomerEventIdempotencyRepository } from './customer-event-idempotency.repository.js';
+import { CUSTOMER_EVENT_CONSUMER_NAME } from './constants/customer-event-consumer.constants.js';
+import { CustomerEventIdempotencyRepository } from './repositories/customer-event-idempotency.repository.js';
 
 @Injectable()
 export class CustomerEventConsumerService implements OnModuleInit {

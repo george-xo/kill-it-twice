@@ -4,8 +4,8 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import type { StructuredLogFields } from '../observability/models/structured-log.model.js';
-import type { PipelineMetricName } from '../observability/pipeline-metrics.constants.js';
-import { PipelineMetricsService } from '../observability/pipeline-metrics.service.js';
+import type { PipelineMetricName } from '../observability/constants/pipeline-metrics.constants.js';
+import { PipelineMetricsService } from '../observability/services/pipeline-metrics.service.js';
 import { StructuredLogger } from '../observability/structured-logger.js';
 import {
   DEFAULT_DESTINATION_RETRY_INITIAL_DELAY_MS,

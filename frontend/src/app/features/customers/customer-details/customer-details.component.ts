@@ -6,6 +6,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, map, of, switchMap } from 'rxjs';
 
+import { CUSTOMER_ID_ROUTE_PARAMETER, CUSTOMERS_MESSAGES } from '../constants/customers.constants';
 import { CustomersApiService } from '../services/customers-api.service';
 
 @Component({
@@ -14,10 +15,10 @@ import { CustomersApiService } from '../services/customers-api.service';
     AsyncPipe,
     DatePipe,
     JsonPipe,
-    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatProgressSpinnerModule,
+    RouterLink,
   ],
   templateUrl: './customer-details.component.html',
   styleUrl: './customer-details.component.scss',
@@ -25,21 +26,24 @@ import { CustomersApiService } from '../services/customers-api.service';
 })
 export class CustomerDetailsComponent {
   private readonly activatedRoute = inject(ActivatedRoute);
+
   private readonly customersApiService = inject(CustomersApiService);
 
   protected readonly errorMessage = signal<string | null>(null);
 
   protected readonly customer$ = this.activatedRoute.paramMap.pipe(
-    map((params) => params.get('customerId')),
+    map((parameters) => parameters.get(CUSTOMER_ID_ROUTE_PARAMETER)),
     switchMap((customerId) => {
       if (!customerId) {
-        this.errorMessage.set('Customer ID is missing');
+        this.errorMessage.set(CUSTOMERS_MESSAGES.CUSTOMER_ID_MISSING);
+
         return of(null);
       }
 
       return this.customersApiService.getCustomer(customerId).pipe(
         catchError(() => {
-          this.errorMessage.set('Customer could not be loaded');
+          this.errorMessage.set(CUSTOMERS_MESSAGES.CUSTOMER_LOAD_FAILED);
+
           return of(null);
         }),
       );

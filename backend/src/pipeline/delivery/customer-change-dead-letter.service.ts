@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 import { RabbitMqService } from '../../destinations/rabbitmq/rabbitmq.service.js';
-import { PIPELINE_METRICS } from '../../observability/pipeline-metrics.constants.js';
-import { PipelineMetricsService } from '../../observability/pipeline-metrics.service.js';
+import { PIPELINE_METRICS } from '../../observability/constants/pipeline-metrics.constants.js';
+import { PipelineMetricsService } from '../../observability/services/pipeline-metrics.service.js';
 import { StructuredLogger } from '../../observability/structured-logger.js';
 import type { CustomerChangeEvent } from '../contracts/customer-change-event.contract.js';
 import type { FailedCustomerChangeEvent } from '../contracts/failed-customer-change-event.contract.js';

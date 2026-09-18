@@ -6,18 +6,22 @@ import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { catchError, type Observable, of } from 'rxjs';
 
+import { SHARED_DISPLAY_LABELS } from '../../core/constants/system-status.constants';
 import type { SystemStatus } from '../../core/models/system-status.model';
 import { SystemStatusApiService } from '../../core/services/system-status-api.service';
+import { DASHBOARD_MESSAGES } from './constants/dashboard.constants';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [AsyncPipe, MatButtonModule, MatCardModule, MatProgressSpinnerModule, DatePipe],
+  imports: [AsyncPipe, DatePipe, MatButtonModule, MatCardModule, MatProgressSpinnerModule],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardComponent {
   private readonly systemStatusApiService = inject(SystemStatusApiService);
+
+  protected readonly displayLabels = SHARED_DISPLAY_LABELS;
 
   protected readonly errorMessage = signal<string | null>(null);
 
@@ -31,7 +35,7 @@ export class DashboardComponent {
   private loadSystemStatus(): Observable<SystemStatus | null> {
     return this.systemStatusApiService.getSystemStatus().pipe(
       catchError((error: HttpErrorResponse) => {
-        this.errorMessage.set(error.message || 'System status could not be loaded');
+        this.errorMessage.set(error.message || DASHBOARD_MESSAGES.STATUS_LOAD_FAILED);
 
         return of(null);
       }),

@@ -12,8 +12,10 @@
     <mat-card appearance="outlined">
       <mat-card-header>
         <mat-card-title>System status</mat-card-title>
+
         <mat-card-subtitle>
-          Last checked: {{ systemStatus.checkedAt | date: 'MMM d, y, HH:mm' }}
+          Last checked:
+          {{ systemStatus.checkedAt | date: 'MMM d, y, HH:mm' }}
         </mat-card-subtitle>
       </mat-card-header>
 
@@ -68,11 +70,19 @@
           </mat-card-header>
 
           <mat-card-content>
-            <p>Status: {{ systemStatus.workers.backfill.status }}</p>
-            <p>Checkpoint: {{ systemStatus.workers.backfill.checkpoint }}</p>
+            <p>
+              Status:
+              {{ systemStatus.workers.backfill?.status ?? displayLabels.UNAVAILABLE }}
+            </p>
+
+            <p>
+              Checkpoint:
+              {{ systemStatus.workers.backfill?.checkpoint ?? displayLabels.UNAVAILABLE }}
+            </p>
+
             <p>
               Processed:
-              {{ systemStatus.workers.backfill.processedCount }}
+              {{ systemStatus.workers.backfill?.processedCount ?? displayLabels.UNAVAILABLE }}
             </p>
           </mat-card-content>
         </mat-card>
@@ -83,14 +93,21 @@
           </mat-card-header>
 
           <mat-card-content>
-            <p>Status: {{ systemStatus.workers.incrementalSync.status }}</p>
+            <p>
+              Status:
+              {{ systemStatus.workers.incrementalSync?.status ?? displayLabels.UNAVAILABLE }}
+            </p>
+
             <p>
               Checkpoint:
-              {{ systemStatus.workers.incrementalSync.checkpoint }}
+              {{ systemStatus.workers.incrementalSync?.checkpoint ?? displayLabels.UNAVAILABLE }}
             </p>
+
             <p>
               Processed:
-              {{ systemStatus.workers.incrementalSync.processedCount }}
+              {{
+                systemStatus.workers.incrementalSync?.processedCount ?? displayLabels.UNAVAILABLE
+              }}
             </p>
           </mat-card-content>
         </mat-card>
@@ -107,7 +124,7 @@
           </mat-card-header>
 
           <mat-card-content>
-            {{ systemStatus.pipeline.sourceRecordCount }}
+            {{ systemStatus.pipeline.sourceRecordCount ?? displayLabels.UNAVAILABLE }}
           </mat-card-content>
         </mat-card>
 
@@ -117,7 +134,7 @@
           </mat-card-header>
 
           <mat-card-content>
-            {{ systemStatus.pipeline.incrementalLag }}
+            {{ systemStatus.pipeline.incrementalLag ?? displayLabels.UNAVAILABLE }}
           </mat-card-content>
         </mat-card>
 
@@ -127,7 +144,12 @@
           </mat-card-header>
 
           <mat-card-content>
-            {{ systemStatus.pipeline.throughputPerSecond }} events/s
+            @if (systemStatus.pipeline.throughputPerSecond !== null) {
+              {{ systemStatus.pipeline.throughputPerSecond }}
+              events/s
+            } @else {
+              {{ displayLabels.UNAVAILABLE }}
+            }
           </mat-card-content>
         </mat-card>
 
@@ -137,7 +159,7 @@
           </mat-card-header>
 
           <mat-card-content>
-            {{ systemStatus.pipeline.counters.deliveredEvents }}
+            {{ systemStatus.pipeline.counters?.deliveredEvents ?? displayLabels.UNAVAILABLE }}
           </mat-card-content>
         </mat-card>
 
@@ -147,7 +169,7 @@
           </mat-card-header>
 
           <mat-card-content>
-            {{ systemStatus.pipeline.counters.duplicateEvents }}
+            {{ systemStatus.pipeline.counters?.duplicateEvents ?? displayLabels.UNAVAILABLE }}
           </mat-card-content>
         </mat-card>
 
@@ -157,7 +179,7 @@
           </mat-card-header>
 
           <mat-card-content>
-            {{ systemStatus.pipeline.counters.deadLetterEvents }}
+            {{ systemStatus.pipeline.counters?.deadLetterEvents ?? displayLabels.UNAVAILABLE }}
           </mat-card-content>
         </mat-card>
       </div>

@@ -6,9 +6,9 @@ import { RabbitMqModule } from '../destinations/rabbitmq/rabbitmq.module.js';
 import { MetricsController } from './controllers/metrics.controller.js';
 import { StatusController } from './controllers/status.controller.js';
 import { PipelineMetricsModule } from './pipeline-metrics.module.js';
-import { PrometheusMetricsService } from './prometheus-metrics.service.js';
-import { SystemStatusRepository } from './system-status.repository.js';
-import { SystemStatusService } from './system-status.service.js';
+import { PrometheusMetricsService } from './services/prometheus-metrics.service.js';
+import { SystemStatusRepository } from './repositories/system-status.repository.js';
+import { SystemStatusService } from './services/system-status.service.js';
 
 @Module({
   imports: [

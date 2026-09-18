@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
 import { CustomersModule } from './customers/customers.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DeadLetterModule } from './dead-letter/dead-letter.module.js';
@@ -28,6 +27,5 @@ import { WorkerControlModule } from './workers/worker-control.module.js';
     DeadLetterModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

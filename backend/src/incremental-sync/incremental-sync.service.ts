@@ -8,8 +8,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { BackfillJobRepository } from '../backfill/backfill-job.repository.js';
-import { CUSTOMER_BACKFILL_JOB_NAME } from '../backfill/backfill.constants.js';
+import { CUSTOMER_BACKFILL_JOB_NAME } from '../backfill/constants/backfill.constants.js';
+import { BackfillJobRepository } from '../backfill/repositories/backfill-job.repository.js';
+import { DatabaseService } from '../database/database.service.js';
 import { ChangeLogBatchDeliveryService } from '../pipeline/delivery/change-log-batch-delivery.service.js';
 import {
   CUSTOMER_INCREMENTAL_SYNC_JOB_NAME,
@@ -22,11 +23,14 @@ import { IncrementalSyncJobRepository } from './incremental-sync-job.repository.
 
 const INCREMENTAL_SYNC_CONTROL_POLL_INTERVAL_MS = 250;
 
+const INCREMENTAL_SYNC_ADVISORY_LOCK_NAME = `incremental-sync:${CUSTOMER_INCREMENTAL_SYNC_JOB_NAME}`;
+
 @Injectable()
 export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IncrementalSyncService.name);
 
   private batchSize = DEFAULT_INCREMENTAL_SYNC_BATCH_SIZE;
+
   private pollIntervalMs = DEFAULT_INCREMENTAL_SYNC_POLL_INTERVAL_MS;
 
   private shutdownRequested = false;
@@ -34,6 +38,7 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly databaseService: DatabaseService,
     private readonly backfillJobRepository: BackfillJobRepository,
     private readonly incrementalSyncJobRepository: IncrementalSyncJobRepository,
     private readonly batchDeliveryService: ChangeLogBatchDeliveryService,
@@ -69,14 +74,25 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
 
   async run(): Promise<void> {
     if (this.running) {
-      throw new Error('Incremental Sync is already running');
+      this.logger.log('Incremental Sync is already running in this process');
+
+      return;
     }
 
     this.running = true;
     this.shutdownRequested = false;
 
     try {
-      await this.executeIncrementalSync();
+      const lockAcquired = await this.databaseService.tryWithAdvisoryLock(
+        INCREMENTAL_SYNC_ADVISORY_LOCK_NAME,
+        () => this.executeIncrementalSync(),
+      );
+
+      if (!lockAcquired) {
+        this.logger.log(
+          'Incremental Sync is already controlled by another process',
+        );
+      }
     } finally {
       this.running = false;
     }
@@ -84,10 +100,6 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
 
   requestStop(): void {
     this.shutdownRequested = true;
-  }
-
-  isRunning(): boolean {
-    return this.running;
   }
 
   onModuleDestroy(): void {
@@ -165,6 +177,7 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
           );
 
           this.logger.log('Incremental Sync paused by control request');
+
           paused = true;
         }
 
@@ -178,6 +191,7 @@ export class IncrementalSyncService implements OnModuleInit, OnModuleDestroy {
         );
 
         this.logger.log('Incremental Sync resumed by control request');
+
         paused = false;
       }
 

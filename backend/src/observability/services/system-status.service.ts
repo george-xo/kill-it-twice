@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common';
 
-import { ElasticsearchService } from '../destinations/elasticsearch/elasticsearch.service.js';
-import { RabbitMqService } from '../destinations/rabbitmq/rabbitmq.service.js';
-import type { PipelineMetric } from './models/pipeline-metric.model.js';
+import { ElasticsearchService } from '../../destinations/elasticsearch/elasticsearch.service.js';
+import { RabbitMqService } from '../../destinations/rabbitmq/rabbitmq.service.js';
+import { WORKER_STATES } from '../../workers/models/worker-command-response.model.js';
+import { PIPELINE_METRICS } from '../constants/pipeline-metrics.constants.js';
+import type { PipelineMetric } from '../models/pipeline-metric.model.js';
 import type {
   PipelineCounters,
   PipelineStatus,
   SystemStatus,
-} from './models/system-status.model.js';
-import { PIPELINE_METRICS } from './pipeline-metrics.constants.js';
+} from '../models/system-status.model.js';
+import { SystemStatusRepository } from '../repositories/system-status.repository.js';
 import { PipelineMetricsService } from './pipeline-metrics.service.js';
-import { SystemStatusRepository } from './system-status.repository.js';
 
 @Injectable()
 export class SystemStatusService {
@@ -46,7 +47,7 @@ export class SystemStatusService {
     );
 
     const allWorkersOperational = Object.values(databaseResult.workers).every(
-      (worker) => worker === null || worker.status !== 'failed',
+      (worker) => worker !== null && worker.status !== WORKER_STATES.FAILED,
     );
 
     return {
@@ -83,7 +84,9 @@ export class SystemStatusService {
       ]);
 
       const latestChangeId = Number(snapshot.latest_change_id);
+
       const processedChangeId = Number(snapshot.processed_change_id);
+
       const processedLastMinute = Number(snapshot.processed_last_minute);
 
       return {
